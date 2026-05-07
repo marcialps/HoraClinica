@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HoraClinica - Gestão de Clínica</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Outfit:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <div id="loginScreen" class="login-screen hidden">
+        <div class="login-card">
+            <i class="fas fa-clinic-medical" style="font-size: 48px; color: var(--primary); margin-bottom: 20px;"></i>
+            <h2>Bem-vindo ao HoraClinica</h2>
+            <p>Selecione seu acesso</p>
+            <div class="login-options">
+                <button id="loginAdmin" class="btn-primary" style="width: 100%; margin-bottom: 12px; justify-content: center;">
+                    Acessar como Administrador
+                </button>
+                <div style="margin: 16px 0; display: flex; align-items: center; gap: 10px;">
+                    <hr style="flex: 1; border: 0; border-top: 1px solid var(--border);">
+                    <span style="font-size: 12px; color: var(--text-muted);">OU PROFISSIONAL</span>
+                    <hr style="flex: 1; border: 0; border-top: 1px solid var(--border);">
+                </div>
+                <div id="profLoginList" class="prof-login-list">
+                    <!-- Professionals will be listed here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="app" class="admin-view hidden"> <!-- Views: admin-view, professional-view -->
+        <!-- Sidebar -->
+        <nav class="sidebar">
+            <div class="logo">
+                <i class="fas fa-clinic-medical"></i>
+                <span>HoraClinica</span>
+            </div>
+            <ul class="nav-links">
+                <li class="active" data-view="agenda">
+                    <i class="fas fa-calendar-alt"></i>
+                    <span>Agenda</span>
+                </li>
+                <li data-view="pacientes" class="admin-only">
+                    <i class="fas fa-user-injured"></i>
+                    <span>Pacientes</span>
+                </li>
+                <li data-view="profissionais" class="admin-only">
+                    <i class="fas fa-user-md"></i>
+                    <span>Profissionais</span>
+                </li>
+                <li data-view="relatorios" class="admin-only">
+                    <i class="fas fa-chart-line"></i>
+                    <span>Relatórios</span>
+                </li>
+            </ul>
+            <div class="user-profile">
+                <div class="avatar" id="userAvatar">AD</div>
+                <div class="user-info">
+                    <span id="userName">Administrador</span>
+                    <small id="userRole">Admin Principal</small>
+                </div>
+                <button id="logoutBtn" title="Sair">
+                    <i class="fas fa-sign-out-alt"></i>
+                </button>
+            </div>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="content">
+            <header class="top-bar">
+                <h1 id="viewTitle">Agenda do Dia</h1>
+                <div class="top-actions">
+                    <div class="date-picker">
+                        <button id="prevDay" title="Dia Anterior"><i class="fas fa-chevron-left"></i></button>
+                        <div class="date-input-wrapper">
+                            <span id="currentDateDisplay">07 de Maio, 2026</span>
+                            <input type="date" id="hiddenDatePicker">
+                        </div>
+                        <button id="nextDay" title="Próximo Dia"><i class="fas fa-chevron-right"></i></button>
+                        <button id="todayBtn" class="btn-secondary" title="Ir para Hoje">Hoje</button>
+                    </div>
+                    <div class="filters">
+                        <select id="professionalFilter">
+                            <option value="all">Todos os Profissionais</option>
+                        </select>
+                    </div>
+                    <button id="addAppointmentBtn" class="btn-primary admin-only">
+                        <i class="fas fa-plus"></i> Novo Agendamento
+                    </button>
+                </div>
+            </header>
+
+            <section id="viewContent">
+                <!-- Content will be injected here via app.js -->
+            </section>
+        </main>
+    </div>
+
+    <!-- Modals -->
+    <div id="modalOverlay" class="modal-overlay hidden">
+        <div class="modal">
+            <header class="modal-header">
+                <h2 id="modalTitle">Novo Agendamento</h2>
+                <button class="close-modal"><i class="fas fa-times"></i></button>
+            </header>
+            <div id="modalBody" class="modal-body">
+                <!-- Modal content injected here -->
+            </div>
+        </div>
+    </div>
+
+    <script src="js/app.js"></script>
+</body>
+</html>
