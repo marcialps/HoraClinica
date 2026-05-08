@@ -934,13 +934,17 @@
             logoutBtn: document.getElementById('logoutBtn')
         };
 
-        loadData();
-
-        // Check for clinic in URL
-        const urlParams = new URLSearchParams(window.location.search);
+        // 1. Detect Clinic from URL immediately (search or hash)
+        const urlParams = new URLSearchParams(window.location.search || window.location.hash.substring(window.location.hash.indexOf('?')));
         const urlClinicId = urlParams.get('clinic');
         if (urlClinicId) {
             state.currentClinicId = urlClinicId;
+        }
+
+        loadData();
+
+        // Check if detected clinic from URL exists in state, if not, try one more loadData
+        if (state.currentClinicId && !state.clinics.find(c => c.id === state.currentClinicId)) {
             loadData();
         }
 
