@@ -932,86 +932,100 @@
     };
 
     const init = async () => {
-        // Map elements
-        elements = {
-            app: document.getElementById('app'),
-            viewContent: document.getElementById('viewContent'),
-            viewTitle: document.getElementById('viewTitle'),
-            navLinks: document.querySelectorAll('.nav-links li'),
-            currentDateDisplay: document.getElementById('currentDateDisplay'),
-            prevDay: document.getElementById('prevDay'),
-            nextDay: document.getElementById('nextDay'),
-            todayBtn: document.getElementById('todayBtn'),
-            hiddenDatePicker: document.getElementById('hiddenDatePicker'),
-            professionalFilter: document.getElementById('professionalFilter'),
-            addAppointmentBtn: document.getElementById('addAppointmentBtn'),
-            modalOverlay: document.getElementById('modalOverlay'),
-            modalTitle: document.getElementById('modalTitle'),
-            modalBody: document.getElementById('modalBody'),
-            closeModal: document.querySelector('.close-modal'),
-            userName: document.getElementById('userName'),
-            userRole: document.getElementById('userRole'),
-            userAvatar: document.getElementById('userAvatar'),
-            logoutBtn: document.getElementById('logoutBtn')
-        };
+        try {
+            console.log("HoraClinica: Inicializando sistema...");
+            // Map elements
+            elements = {
+                app: document.getElementById('app'),
+                viewContent: document.getElementById('viewContent'),
+                viewTitle: document.getElementById('viewTitle'),
+                navLinks: document.querySelectorAll('.nav-links li'),
+                currentDateDisplay: document.getElementById('currentDateDisplay'),
+                prevDay: document.getElementById('prevDay'),
+                nextDay: document.getElementById('nextDay'),
+                todayBtn: document.getElementById('todayBtn'),
+                hiddenDatePicker: document.getElementById('hiddenDatePicker'),
+                professionalFilter: document.getElementById('professionalFilter'),
+                addAppointmentBtn: document.getElementById('addAppointmentBtn'),
+                modalOverlay: document.getElementById('modalOverlay'),
+                modalTitle: document.getElementById('modalTitle'),
+                modalBody: document.getElementById('modalBody'),
+                closeModal: document.querySelector('.close-modal'),
+                userName: document.getElementById('userName'),
+                userRole: document.getElementById('userRole'),
+                userAvatar: document.getElementById('userAvatar'),
+                logoutBtn: document.getElementById('logoutBtn')
+            };
 
-        // 1. Detect Clinic from URL immediately
-        const urlParams = new URLSearchParams(window.location.search || window.location.hash.substring(window.location.hash.indexOf('?')));
-        const urlClinicId = urlParams.get('clinic');
-        if (urlClinicId) {
-            state.currentClinicId = urlClinicId;
-        }
+            // 1. Detect Clinic from URL immediately
+            const urlParams = new URLSearchParams(window.location.search || window.location.hash.substring(window.location.hash.indexOf('?')));
+            const urlClinicId = urlParams.get('clinic');
+            if (urlClinicId) {
+                state.currentClinicId = urlClinicId;
+            }
 
-        // 2. Migration and Initial Listeners
-        await migrateToFirebase();
-        setupListeners();
+            // 2. Firebase check
+            if (typeof db === 'undefined') {
+                console.error("Firebase: Banco de dados não detectado. Verifique sua conexão.");
+                renderLandingPage();
+                return;
+            }
 
-        // Event Listeners
-        elements.navLinks.forEach(link => {
-            link.onclick = () => switchView(link.dataset.view);
-        });
+            // 3. Migration and Initial Listeners
+            await migrateToFirebase();
+            setupListeners();
 
-        elements.prevDay.onclick = () => {
-            state.currentDate.setDate(state.currentDate.getDate() - 1);
-            renderView();
-        };
+            // Event Listeners
+            elements.navLinks.forEach(link => {
+                link.onclick = () => switchView(link.dataset.view);
+            });
 
-        elements.nextDay.onclick = () => {
-            state.currentDate.setDate(state.currentDate.getDate() + 1);
-            renderView();
-        };
+            elements.prevDay.onclick = () => {
+                state.currentDate.setDate(state.currentDate.getDate() - 1);
+                renderView();
+            };
 
-        elements.todayBtn.onclick = () => {
-            state.currentDate = new Date(new Date().setHours(0, 0, 0, 0));
-            renderView();
-        };
+            elements.nextDay.onclick = () => {
+                state.currentDate.setDate(state.currentDate.getDate() + 1);
+                renderView();
+            };
 
-        elements.hiddenDatePicker.onchange = (e) => {
-            if (e.target.value) {
-                const [y, m, d] = e.target.value.split('-').map(Number);
-                state.currentDate = new Date(y, m - 1, d);
+            elements.todayBtn.onclick = () => {
+                state.currentDate = new Date(new Date().setHours(0, 0, 0, 0));
+                renderView();
+            };
+
+            elements.hiddenDatePicker.onchange = (e) => {
+                if (e.target.value) {
+                    const [y, m, d] = e.target.value.split('-').map(Number);
+                    state.currentDate = new Date(y, m - 1, d);
+                    renderView();
+                }
+            };
+
+            elements.professionalFilter.onchange = () => renderView();
+            elements.addAppointmentBtn.onclick = () => openNewAppointmentModal();
+            elements.closeModal.onclick = () => elements.modalOverlay.classList.add('hidden');
+            elements.logoutBtn.onclick = () => {
+                state.currentUser = null;
+                state.currentClinicId = null;
+                setupListeners();
+                renderLoginScreen();
+            };
+
+            if (!state.currentUser) {
+                renderLoginScreen();
+            } else {
+                elements.app.classList.remove('hidden');
+                document.getElementById('landingPage').classList.add('hidden');
+                updateUserUI();
+                populateProfFilter();
                 renderView();
             }
-        };
-
-        elements.professionalFilter.onchange = () => renderView();
-        elements.addAppointmentBtn.onclick = () => openNewAppointmentModal();
-        elements.closeModal.onclick = () => elements.modalOverlay.classList.add('hidden');
-        elements.logoutBtn.onclick = () => {
-            state.currentUser = null;
-            state.currentClinicId = null;
-            setupListeners(); // Re-setup as public
-            renderLoginScreen();
-        };
-
-        if (!state.currentUser) {
-            renderLoginScreen();
-        } else {
-            document.getElementById('app').classList.remove('hidden');
-            document.getElementById('landingPage').classList.add('hidden');
-            updateUserUI();
-            populateProfFilter();
-            renderView();
+        } catch (error) {
+            console.error("Erro crítico na inicialização:", error);
+            // Show landing page as fallback if everything crashes
+            document.getElementById('landingPage').classList.remove('hidden');
         }
     };
 
