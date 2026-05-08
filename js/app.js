@@ -446,7 +446,7 @@
                 </form>
             `;
             elements.modalOverlay.classList.remove('hidden');
-            document.getElementById('clinicForm').onsubmit = (e) => {
+            document.getElementById('clinicForm').onsubmit = async (e) => {
                 e.preventDefault();
                 const newClinic = {
                     id: 'clinic_' + Date.now(),
@@ -457,7 +457,6 @@
                 };
                 await saveData('clinics', newClinic);
                 elements.modalOverlay.classList.add('hidden');
-                // No need to call renderSuperAdmin manually, the listener will handle it
             };
         };
 
@@ -638,7 +637,7 @@
         
         elements.modalOverlay.classList.remove('hidden');
         
-        document.getElementById('appointmentForm').onsubmit = (e) => {
+        document.getElementById('appointmentForm').onsubmit = async (e) => {
             e.preventDefault();
             const newApp = {
                 id: Date.now().toString(),
