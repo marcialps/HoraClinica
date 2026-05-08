@@ -318,13 +318,19 @@
                 if (state.currentUser) {
                     populateProfFilter();
                     renderView();
+                } else {
+                    renderLoginScreen();
                 }
             });
             unsubscribes.push(unsubProfs);
 
             const unsubApps = clinicRef.collection('appointments').onSnapshot(snapshot => {
                 state.appointments = snapshot.docs.map(doc => doc.data());
-                if (state.currentUser) renderView();
+                if (state.currentUser) {
+                    renderView();
+                } else {
+                    renderLoginScreen();
+                }
             });
             unsubscribes.push(unsubApps);
         }
