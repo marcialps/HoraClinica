@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,7 +8,9 @@
     <link rel="stylesheet" href="style.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Outfit:wght@400;600;700&display=swap" rel="stylesheet">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Outfit:wght@400;600;700&display=swap"
+        rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 
     <!-- Firebase SDKs (Compat Version) -->
@@ -15,6 +18,7 @@
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
     <script src="js/firebase-config.js"></script>
 </head>
+
 <body>
     <!-- Landing Page (Apresentação) -->
     <div id="landingPage" class="landing-page hidden">
@@ -27,21 +31,22 @@
                 <button id="goToSuperAdmin" class="btn-ghost">Portal do Parceiro</button>
             </div>
         </nav>
-        
+
         <section class="hero-section">
             <div class="hero-content">
                 <span class="badge">Gestão Médica 2.0</span>
                 <h1>A plataforma completa para <span class="text-gradient">sua clínica brilhar.</span></h1>
-                <p>Organize sua agenda, gerencie pacientes e gere relatórios detalhados com a simplicidade que você sempre quis.</p>
+                <p>Organize sua agenda, gerencie pacientes e gere relatórios detalhados com a simplicidade que você
+                    sempre quis.</p>
                 <div class="hero-btns">
-                    <button id="startNow" class="btn-primary">Acessar Sistema</button>
-                    <button class="btn-secondary">Ver Demonstração</button>
+
                 </div>
             </div>
             <div class="hero-visual">
                 <div class="floating-card c1"><i class="fas fa-calendar-check"></i> <span>Agenda Organizada</span></div>
                 <div class="floating-card c2"><i class="fas fa-user-md"></i> <span>Profissionais Ativos</span></div>
-                <img src="https://images.unsplash.com/photo-1576091160550-2173dba999ef?auto=format&fit=crop&w=800&q=80" alt="Clinic Management" class="hero-img">
+                <img src="https://images.unsplash.com/photo-1576091160550-2173dba999ef?auto=format&fit=crop&w=800&q=80"
+                    alt="Clinic Management" class="hero-img">
             </div>
         </section>
 
@@ -72,7 +77,8 @@
             <h2 id="loginWelcome">Bem-vindo ao HoraClinica</h2>
             <p id="loginSubtitle">Selecione seu acesso</p>
             <div class="login-options">
-                <button id="loginAdmin" class="btn-primary" style="width: 100%; margin-bottom: 12px; justify-content: center;">
+                <button id="loginAdmin" class="btn-primary"
+                    style="width: 100%; margin-bottom: 12px; justify-content: center;">
                     Acessar como Administrador
                 </button>
                 <div style="margin: 16px 0; display: flex; align-items: center; gap: 10px;">
@@ -84,7 +90,8 @@
                     <!-- Professionals will be listed here -->
                 </div>
                 <div style="margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--border);">
-                    <button id="loginSuperAdmin" style="background: none; border: none; color: var(--text-muted); font-size: 12px; cursor: pointer; text-decoration: underline; width: 100%;">
+                    <button id="loginSuperAdmin"
+                        style="background: none; border: none; color: var(--text-muted); font-size: 12px; cursor: pointer; text-decoration: underline; width: 100%;">
                         Acesso Super Admin
                     </button>
                 </div>
@@ -179,4 +186,5 @@
 
     <script src="js/app.js"></script>
 </body>
+
 </html>
