@@ -289,9 +289,16 @@
                 renderSuperAdmin();
             }
             
-            // If we are at the login/landing stage, refresh to catch the clinic from URL or update selector
+            // If we are at the login/landing stage
             if (!state.currentUser) {
-                renderLoginScreen();
+                const landingVisible = !document.getElementById('landingPage').classList.contains('hidden');
+                
+                // Only auto-switch to login screen if:
+                // 1. We have a specific clinic in the URL
+                // 2. OR we are already in the login screen (not landing)
+                if (state.currentClinicId || !landingVisible) {
+                    renderLoginScreen();
+                }
             }
         });
         unsubscribes.push(unsubClinics);
