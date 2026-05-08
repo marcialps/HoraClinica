@@ -406,7 +406,7 @@
                         <div class="clinic-card">
                             <div class="clinic-info">
                                 <h4>${c.name}</h4>
-                                <p><i class="fas fa-map-marker-alt"></i> ${c.address || 'Sem endereço'}</p>
+                                <p><i class="fas fa-envelope"></i> ${c.email || 'Sem e-mail'}</p>
                                 <p><i class="fas fa-phone"></i> ${c.phone || 'Sem telefone'}</p>
                                 <p><i class="fas fa-id-badge"></i> ID: ${c.id}</p>
                             </div>
@@ -439,7 +439,7 @@
             elements.modalBody.innerHTML = `
                 <form id="clinicForm">
                     <div class="form-group"><label>Nome da Clínica</label><input type="text" id="cName" required></div>
-                    <div class="form-group"><label>Endereço</label><input type="text" id="cAddress" required></div>
+                    <div class="form-group"><label>E-mail de Contato</label><input type="email" id="cEmail" required></div>
                     <div class="form-group"><label>Telefone de Contato</label><input type="text" id="cPhone" required></div>
                     <div class="form-group"><label>Senha do Admin da Clínica</label><input type="password" id="cAdminPass" required></div>
                     <button type="submit" class="btn-primary" style="width: 100%; justify-content: center;">Salvar Clínica</button>
@@ -451,7 +451,7 @@
                 const newClinic = {
                     id: 'clinic_' + Date.now(),
                     name: document.getElementById('cName').value,
-                    address: document.getElementById('cAddress').value,
+                    email: document.getElementById('cEmail').value,
                     phone: document.getElementById('cPhone').value,
                     adminPass: document.getElementById('cAdminPass').value
                 };
@@ -476,7 +476,7 @@
                 elements.modalBody.innerHTML = `
                     <form id="editClinicForm">
                         <div class="form-group"><label>Nome da Clínica</label><input type="text" id="cName" value="${clinic.name}" required></div>
-                        <div class="form-group"><label>Endereço</label><input type="text" id="cAddress" value="${clinic.address}" required></div>
+                        <div class="form-group"><label>E-mail de Contato</label><input type="email" id="cEmail" value="${clinic.email || ''}" required></div>
                         <div class="form-group"><label>Telefone de Contato</label><input type="text" id="cPhone" value="${clinic.phone || ''}" required></div>
                         <div class="form-group"><label>Senha do Admin da Clínica</label><input type="password" id="cAdminPass" value="${clinic.adminPass || ''}" required></div>
                         <button type="submit" class="btn-primary" style="width: 100%; justify-content: center;">Atualizar Clínica</button>
@@ -486,7 +486,7 @@
                 document.getElementById('editClinicForm').onsubmit = async (e) => {
                     e.preventDefault();
                     clinic.name = document.getElementById('cName').value;
-                    clinic.address = document.getElementById('cAddress').value;
+                    clinic.email = document.getElementById('cEmail').value;
                     clinic.phone = document.getElementById('cPhone').value;
                     clinic.adminPass = document.getElementById('cAdminPass').value;
                     await saveData('clinics', clinic);
