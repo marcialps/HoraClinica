@@ -61,28 +61,57 @@
                 
                 renderProfessionalList(profList);
             } else {
-                // Clinic ID provided but not found in this device's storage
                 document.getElementById('loginWelcome').innerText = 'Clínica não encontrada';
                 document.getElementById('loginSubtitle').innerText = 'O link acessado é inválido ou a clínica foi removida.';
                 document.getElementById('clinicLogoArea').innerHTML = '<i class="fas fa-exclamation-circle" style="font-size: 48px; color: #ef4444;"></i>';
                 profList.innerHTML = `<button onclick="window.location.href='index.html'" class="btn-secondary" style="width: 100%; justify-content: center; margin-top: 20px;">Voltar para o Início</button>`;
                 document.getElementById('loginAdmin').classList.add('hidden');
             }
-            return;
-        }
-
-        // PRIORITY 2: No clinic ID but clinics exist (Generic access)
-        if (state.clinics.length > 0) {
+        } 
+        // PRIORITY 2: No clinic ID but clinics exist
+        else if (state.clinics.length > 0) {
             document.getElementById('loginWelcome').innerText = 'Bem-vindo ao HoraClinica';
             document.getElementById('loginSubtitle').innerText = 'Selecione a clínica para acessar';
             document.getElementById('clinicLogoArea').innerHTML = '<i class="fas fa-clinic-medical" style="font-size: 48px; color: var(--primary);"></i>';
-            
             renderClinicSelector(profList);
-            return;
+        }
+        // DEFAULT: Show Landing Page
+        else {
+            renderLandingPage();
         }
 
-        // DEFAULT: Show Landing Page
-        renderLandingPage();
+        // Always attach Super Admin listener
+        document.getElementById('loginSuperAdmin').onclick = () => {
+            elements.modalTitle.innerText = 'Acesso Super Admin';
+            elements.modalBody.innerHTML = `
+                <div style="text-align: center; margin-bottom: 20px;">
+                    <i class="fas fa-user-shield" style="font-size: 48px; color: var(--primary); margin-bottom: 16px;"></i>
+                    <p style="color: var(--text-muted); font-size: 14px;">Digite a senha mestre para acessar o painel de parceiro.</p>
+                </div>
+                <form id="superAdminForm">
+                    <div class="form-group">
+                        <label>Senha Mestre</label>
+                        <input type="password" id="superPass" placeholder="••••••••" required autofocus style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid var(--border);">
+                    </div>
+                    <p id="superLoginError" style="color: #ef4444; font-size: 12px; margin-bottom: 12px;" class="hidden">Senha mestre incorreta!</p>
+                    <button type="submit" class="btn-primary" style="width: 100%; justify-content: center; padding: 12px;">Entrar no Painel</button>
+                </form>
+            `;
+            elements.modalOverlay.classList.remove('hidden');
+            
+            document.getElementById('superAdminForm').onsubmit = (e) => {
+                e.preventDefault();
+                const pass = document.getElementById('superPass').value;
+                if (pass === 'admin123') {
+                    state.currentUser = { role: 'super-admin', name: 'Super Admin' };
+                    state.currentClinicId = null;
+                    elements.modalOverlay.classList.add('hidden');
+                    finishLogin();
+                } else {
+                    document.getElementById('superLoginError').classList.remove('hidden');
+                }
+            };
+        };
     };
 
     const renderProfessionalList = (container) => {
@@ -134,7 +163,6 @@
         };
         container.appendChild(backBtn);
 
-        // Ensure Admin button is visible and updated
         document.getElementById('loginAdmin').classList.remove('hidden');
         document.getElementById('loginAdmin').disabled = false;
         document.getElementById('loginAdmin').style.opacity = '1';
@@ -167,7 +195,6 @@
         document.getElementById('loginAdmin').onclick = () => {
             if (!state.currentClinicId) return;
             const clinic = state.clinics.find(c => c.id === state.currentClinicId);
-            
             elements.modalTitle.innerText = 'Acesso Administrativo';
             elements.modalBody.innerHTML = `
                 <div style="text-align: center; margin-bottom: 20px;">
@@ -184,7 +211,6 @@
                 </form>
             `;
             elements.modalOverlay.classList.remove('hidden');
-            
             document.getElementById('clinicAdminLoginForm').onsubmit = (e) => {
                 e.preventDefault();
                 const pass = document.getElementById('clinicAdminPass').value;
@@ -195,39 +221,6 @@
                     finishLogin();
                 } else {
                     document.getElementById('clinicAdminLoginError').classList.remove('hidden');
-                }
-            };
-        };
-    };
-
-        document.getElementById('loginSuperAdmin').onclick = () => {
-            elements.modalTitle.innerText = 'Acesso Super Admin';
-            elements.modalBody.innerHTML = `
-                <div style="text-align: center; margin-bottom: 20px;">
-                    <i class="fas fa-user-shield" style="font-size: 48px; color: var(--primary); margin-bottom: 16px;"></i>
-                    <p style="color: var(--text-muted); font-size: 14px;">Digite a senha mestre para acessar o painel de parceiro.</p>
-                </div>
-                <form id="superAdminForm">
-                    <div class="form-group">
-                        <label>Senha Mestre</label>
-                        <input type="password" id="superPass" placeholder="••••••••" required autofocus style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid var(--border);">
-                    </div>
-                    <p id="superLoginError" style="color: #ef4444; font-size: 12px; margin-bottom: 12px;" class="hidden">Senha mestre incorreta!</p>
-                    <button type="submit" class="btn-primary" style="width: 100%; justify-content: center; padding: 12px;">Entrar no Painel</button>
-                </form>
-            `;
-            elements.modalOverlay.classList.remove('hidden');
-            
-            document.getElementById('superAdminForm').onsubmit = (e) => {
-                e.preventDefault();
-                const pass = document.getElementById('superPass').value;
-                if (pass === 'admin123') {
-                    state.currentUser = { role: 'super-admin', name: 'Super Admin' };
-                    state.currentClinicId = null;
-                    elements.modalOverlay.classList.add('hidden');
-                    finishLogin();
-                } else {
-                    document.getElementById('superLoginError').classList.remove('hidden');
                 }
             };
         };
