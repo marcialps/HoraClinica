@@ -141,9 +141,37 @@
 
         document.getElementById('loginAdmin').onclick = () => {
             if (!state.currentClinicId) return;
-            state.currentUser = { role: 'admin', name: 'Administrador' };
-            elements.professionalFilter.value = 'all';
-            finishLogin();
+            const clinic = state.clinics.find(c => c.id === state.currentClinicId);
+            
+            elements.modalTitle.innerText = 'Acesso Administrativo';
+            elements.modalBody.innerHTML = `
+                <div style="text-align: center; margin-bottom: 20px;">
+                    <i class="fas fa-lock" style="font-size: 48px; color: var(--primary); margin-bottom: 16px;"></i>
+                    <p style="color: var(--text-muted); font-size: 14px;">Acesso restrito ao administrador de <strong>${clinic.name}</strong>.</p>
+                </div>
+                <form id="clinicAdminLoginForm">
+                    <div class="form-group">
+                        <label>Senha Administrativa</label>
+                        <input type="password" id="clinicAdminPass" placeholder="••••••••" required autofocus style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid var(--border);">
+                    </div>
+                    <p id="clinicAdminLoginError" style="color: #ef4444; font-size: 12px; margin-bottom: 12px;" class="hidden">Senha administrativa incorreta!</p>
+                    <button type="submit" class="btn-primary" style="width: 100%; justify-content: center; padding: 12px;">Entrar na Clínica</button>
+                </form>
+            `;
+            elements.modalOverlay.classList.remove('hidden');
+            
+            document.getElementById('clinicAdminLoginForm').onsubmit = (e) => {
+                e.preventDefault();
+                const pass = document.getElementById('clinicAdminPass').value;
+                if (pass === (clinic.adminPass || '123')) { // Default to 123 for migrated clinics
+                    state.currentUser = { role: 'admin', name: 'Administrador' };
+                    elements.professionalFilter.value = 'all';
+                    elements.modalOverlay.classList.add('hidden');
+                    finishLogin();
+                } else {
+                    document.getElementById('clinicAdminLoginError').classList.remove('hidden');
+                }
+            };
         };
 
         document.getElementById('loginSuperAdmin').onclick = () => {
@@ -314,6 +342,7 @@
                             <div class="clinic-info">
                                 <h4>${c.name}</h4>
                                 <p><i class="fas fa-map-marker-alt"></i> ${c.address || 'Sem endereço'}</p>
+                                <p><i class="fas fa-phone"></i> ${c.phone || 'Sem telefone'}</p>
                                 <p><i class="fas fa-id-badge"></i> ID: ${c.id}</p>
                             </div>
                             <div class="clinic-actions">
@@ -346,6 +375,8 @@
                 <form id="clinicForm">
                     <div class="form-group"><label>Nome da Clínica</label><input type="text" id="cName" required></div>
                     <div class="form-group"><label>Endereço</label><input type="text" id="cAddress" required></div>
+                    <div class="form-group"><label>Telefone de Contato</label><input type="text" id="cPhone" required></div>
+                    <div class="form-group"><label>Senha do Admin da Clínica</label><input type="password" id="cAdminPass" required></div>
                     <button type="submit" class="btn-primary" style="width: 100%; justify-content: center;">Salvar Clínica</button>
                 </form>
             `;
@@ -355,7 +386,9 @@
                 const newClinic = {
                     id: 'clinic_' + Date.now(),
                     name: document.getElementById('cName').value,
-                    address: document.getElementById('cAddress').value
+                    address: document.getElementById('cAddress').value,
+                    phone: document.getElementById('cPhone').value,
+                    adminPass: document.getElementById('cAdminPass').value
                 };
                 state.clinics.push(newClinic);
                 saveData();
@@ -381,6 +414,8 @@
                     <form id="editClinicForm">
                         <div class="form-group"><label>Nome da Clínica</label><input type="text" id="cName" value="${clinic.name}" required></div>
                         <div class="form-group"><label>Endereço</label><input type="text" id="cAddress" value="${clinic.address}" required></div>
+                        <div class="form-group"><label>Telefone de Contato</label><input type="text" id="cPhone" value="${clinic.phone || ''}" required></div>
+                        <div class="form-group"><label>Senha do Admin da Clínica</label><input type="password" id="cAdminPass" value="${clinic.adminPass || ''}" required></div>
                         <button type="submit" class="btn-primary" style="width: 100%; justify-content: center;">Atualizar Clínica</button>
                     </form>
                 `;
@@ -389,6 +424,8 @@
                     e.preventDefault();
                     clinic.name = document.getElementById('cName').value;
                     clinic.address = document.getElementById('cAddress').value;
+                    clinic.phone = document.getElementById('cPhone').value;
+                    clinic.adminPass = document.getElementById('cAdminPass').value;
                     saveData();
                     elements.modalOverlay.classList.add('hidden');
                     renderSuperAdmin();
