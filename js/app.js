@@ -1,6 +1,8 @@
 (function() {
     // State Management
     const state = {
+        clinics: [],
+        currentClinicId: null,
         patients: [],
         professionals: [],
         appointments: [],
@@ -12,92 +14,247 @@
     // DOM Elements - to be populated on init
     let elements = {};
 
+    const migrateOldData = () => {
+        const oldPatients = localStorage.getItem('hc_patients');
+        if (oldPatients && !localStorage.getItem('hc_clinics')) {
+            const defaultClinic = {
+                id: 'clinic_' + Date.now(),
+                name: 'Minha Clínica',
+                address: 'Endereço Padrão'
+            };
+            const clinics = [defaultClinic];
+            localStorage.setItem('hc_clinics', JSON.stringify(clinics));
+            
+            // Move data
+            localStorage.setItem(`hc_${defaultClinic.id}_patients`, oldPatients);
+            localStorage.setItem(`hc_${defaultClinic.id}_professionals`, localStorage.getItem('hc_professionals') || '[]');
+            localStorage.setItem(`hc_${defaultClinic.id}_appointments`, localStorage.getItem('hc_appointments') || '[]');
+            
+            // Clear old keys
+            localStorage.removeItem('hc_patients');
+            localStorage.removeItem('hc_professionals');
+            localStorage.removeItem('hc_appointments');
+        }
+    };
+
     const renderLoginScreen = () => {
         const loginScreen = document.getElementById('loginScreen');
         const app = document.getElementById('app');
         const profList = document.getElementById('profLoginList');
+        const landingPage = document.getElementById('landingPage');
         
         loginScreen.classList.remove('hidden');
         app.classList.add('hidden');
+        landingPage.classList.add('hidden');
+
+        // Reset sidebar clinic context
+        document.querySelector('.logo span').innerText = 'HoraClinica';
         
-        profList.innerHTML = '';
-        state.professionals.forEach(p => {
-            const btn = document.createElement('button');
-            btn.className = 'prof-login-btn';
-            btn.innerText = p.name;
-            btn.onclick = () => {
-                elements.modalTitle.innerText = `Acesso: ${p.name}`;
-                elements.modalBody.innerHTML = `
-                    <form id="profLoginForm">
-                        <div class="form-group">
-                            <label>Senha de Acesso</label>
-                            <input type="password" id="loginPass" required autofocus>
-                        </div>
-                        <p id="loginError" style="color: #ef4444; font-size: 12px; margin-bottom: 12px;" class="hidden">Senha incorreta!</p>
-                        <button type="submit" class="btn-primary" style="width: 100%; justify-content: center;">Entrar</button>
-                    </form>
-                `;
-                elements.modalOverlay.classList.remove('hidden');
-                
-                document.getElementById('profLoginForm').onsubmit = (e) => {
-                    e.preventDefault();
-                    const pass = document.getElementById('loginPass').value;
-                    if (pass === p.password) {
-                        state.currentUser = { role: 'professional', name: p.name, id: p.id, specialty: p.specialty };
-                        elements.professionalFilter.value = p.id;
-                        elements.modalOverlay.classList.add('hidden');
-                        finishLogin();
-                    } else {
-                        document.getElementById('loginError').classList.remove('hidden');
-                    }
-                };
+        if (!state.currentClinicId && state.clinics.length > 0) {
+            // This case only happens if user somehow skips landing but has no clinic in URL
+            document.getElementById('loginWelcome').innerText = 'Bem-vindo ao HoraClinica';
+            document.getElementById('loginSubtitle').innerText = 'Selecione a clínica para acessar';
+            document.getElementById('clinicLogoArea').innerHTML = '<i class="fas fa-clinic-medical" style="font-size: 48px; color: var(--primary);"></i>';
+            
+            profList.innerHTML = `
+                <div class="form-group" style="margin-bottom: 20px;">
+                    <select id="clinicSelector" style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid var(--border); font-family: inherit;">
+                        <option value="">Escolha uma clínica...</option>
+                        ${state.clinics.map(c => `<option value="${c.id}">${c.name}</option>`).join('')}
+                    </select>
+                </div>
+            `;
+            document.getElementById('loginAdmin').disabled = true;
+            document.getElementById('loginAdmin').style.opacity = '0.5';
+
+            document.getElementById('clinicSelector').onchange = (e) => {
+                const id = e.target.value;
+                if (id) {
+                    state.currentClinicId = id;
+                    document.getElementById('loginAdmin').disabled = false;
+                    document.getElementById('loginAdmin').style.opacity = '1';
+                    loadData();
+                    renderLoginScreen();
+                }
             };
-            profList.appendChild(btn);
-        });
+            return;
+        }
+
+        if (state.currentClinicId) {
+            const clinic = state.clinics.find(c => c.id === state.currentClinicId);
+            document.getElementById('loginWelcome').innerText = `Bem-vindo à ${clinic.name}`;
+            document.getElementById('loginSubtitle').innerText = 'Escolha seu perfil profissional';
+            document.getElementById('clinicLogoArea').innerHTML = `<div style="width: 80px; height: 80px; background: var(--primary); border-radius: 20px; display: flex; align-items: center; justify-content: center; margin: 0 auto; color: white; font-size: 32px; font-weight: bold; box-shadow: 0 10px 20px rgba(37, 99, 235, 0.2);">${clinic.name.substring(0, 1).toUpperCase()}</div>`;
+            
+            profList.innerHTML = '';
+            
+            state.professionals.forEach(p => {
+                const btn = document.createElement('button');
+                btn.className = 'prof-login-btn';
+                btn.innerHTML = `
+                    <div style="width: 32px; height: 32px; background: ${p.color}; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-size: 12px; font-weight: bold;">${p.name.substring(0, 2).toUpperCase()}</div>
+                    <span>${p.name}</span>
+                `;
+                btn.onclick = () => {
+                    elements.modalTitle.innerText = `Acesso: ${p.name}`;
+                    elements.modalBody.innerHTML = `
+                        <form id="profLoginForm">
+                            <div class="form-group">
+                                <label>Senha de Acesso</label>
+                                <input type="password" id="loginPass" required autofocus style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid var(--border);">
+                            </div>
+                            <p id="loginError" style="color: #ef4444; font-size: 12px; margin-bottom: 12px;" class="hidden">Senha incorreta!</p>
+                            <button type="submit" class="btn-primary" style="width: 100%; justify-content: center; padding: 12px;">Entrar</button>
+                        </form>
+                    `;
+                    elements.modalOverlay.classList.remove('hidden');
+                    
+                    document.getElementById('profLoginForm').onsubmit = (e) => {
+                        e.preventDefault();
+                        const pass = document.getElementById('loginPass').value;
+                        if (pass === p.password) {
+                            state.currentUser = { role: 'professional', name: p.name, id: p.id, specialty: p.specialty };
+                            elements.professionalFilter.value = p.id;
+                            elements.modalOverlay.classList.add('hidden');
+                            finishLogin();
+                        } else {
+                            document.getElementById('loginError').classList.remove('hidden');
+                        }
+                    };
+                };
+                profList.appendChild(btn);
+            });
+
+            // Back to landing
+            const backBtn = document.createElement('button');
+            backBtn.innerHTML = '<i class="fas fa-arrow-left"></i> Voltar';
+            backBtn.style = 'background: none; border: none; color: var(--text-muted); font-size: 13px; cursor: pointer; width: 100%; margin-top: 20px; display: flex; align-items: center; justify-content: center; gap: 8px;';
+            backBtn.onclick = () => {
+                state.currentClinicId = null;
+                window.history.pushState({}, '', window.location.pathname); // Clear URL
+                renderLandingPage();
+            };
+            profList.appendChild(backBtn);
+        } else {
+            renderLandingPage();
+        }
 
         document.getElementById('loginAdmin').onclick = () => {
+            if (!state.currentClinicId) return;
             state.currentUser = { role: 'admin', name: 'Administrador' };
             elements.professionalFilter.value = 'all';
             finishLogin();
+        };
+
+        document.getElementById('loginSuperAdmin').onclick = () => {
+            elements.modalTitle.innerText = 'Acesso Super Admin';
+            elements.modalBody.innerHTML = `
+                <div style="text-align: center; margin-bottom: 20px;">
+                    <i class="fas fa-user-shield" style="font-size: 48px; color: var(--primary); margin-bottom: 16px;"></i>
+                    <p style="color: var(--text-muted); font-size: 14px;">Digite a senha mestre para acessar o painel de parceiro.</p>
+                </div>
+                <form id="superAdminForm">
+                    <div class="form-group">
+                        <label>Senha Mestre</label>
+                        <input type="password" id="superPass" placeholder="••••••••" required autofocus style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid var(--border);">
+                    </div>
+                    <p id="superLoginError" style="color: #ef4444; font-size: 12px; margin-bottom: 12px;" class="hidden">Senha mestre incorreta!</p>
+                    <button type="submit" class="btn-primary" style="width: 100%; justify-content: center; padding: 12px;">Entrar no Painel</button>
+                </form>
+            `;
+            elements.modalOverlay.classList.remove('hidden');
+            
+            document.getElementById('superAdminForm').onsubmit = (e) => {
+                e.preventDefault();
+                const pass = document.getElementById('superPass').value;
+                if (pass === 'admin123') {
+                    state.currentUser = { role: 'super-admin', name: 'Super Admin' };
+                    state.currentClinicId = null;
+                    elements.modalOverlay.classList.add('hidden');
+                    finishLogin();
+                } else {
+                    document.getElementById('superLoginError').classList.remove('hidden');
+                }
+            };
+        };
+    };
+
+    const renderLandingPage = () => {
+        document.getElementById('landingPage').classList.remove('hidden');
+        document.getElementById('loginScreen').classList.add('hidden');
+        document.getElementById('app').classList.add('hidden');
+        
+        document.getElementById('startNow').onclick = () => {
+            if (state.clinics.length > 0) {
+                renderLoginScreen();
+            } else {
+                alert("Nenhuma clínica cadastrada no sistema. Use o Portal do Parceiro para criar a primeira clínica.");
+            }
+        };
+
+        document.getElementById('goToSuperAdmin').onclick = () => {
+            document.getElementById('loginSuperAdmin').click();
         };
     };
 
     const finishLogin = () => {
         document.getElementById('loginScreen').classList.add('hidden');
+        document.getElementById('landingPage').classList.add('hidden');
         document.getElementById('app').classList.remove('hidden');
         updateUserUI();
-        switchView('agenda');
+        
+        if (state.currentUser.role === 'super-admin') {
+            switchView('super-admin');
+        } else {
+            const clinic = state.clinics.find(c => c.id === state.currentClinicId);
+            document.querySelector('.logo span').innerText = clinic ? clinic.name : 'HoraClinica';
+            populateProfFilter();
+            switchView('agenda');
+        }
+    };
+
+    const populateProfFilter = () => {
+        if (!elements.professionalFilter) return;
+        elements.professionalFilter.innerHTML = '<option value="all">Todos os Profissionais</option>';
+        state.professionals.forEach(p => {
+            const opt = document.createElement('option');
+            opt.value = p.id;
+            opt.innerText = p.name;
+            elements.professionalFilter.appendChild(opt);
+        });
     };
 
     // Load Data
     const loadData = () => {
         try {
-            state.patients = JSON.parse(localStorage.getItem('hc_patients')) || [
-                { id: '1', name: 'Mateus Felipe', phone: '11999999999' },
-                { id: '2', name: 'Paulo Atilio', phone: '11888888888' }
-            ];
-            state.professionals = JSON.parse(localStorage.getItem('hc_professionals')) || [
-                { id: '1', name: 'Amanda', specialty: 'Dermatologia', password: '123', color: '#22c55e' },
-                { id: '2', name: 'Anik', specialty: 'Pediatria', password: '123', color: '#3b82f6' },
-                { id: '3', name: 'Cintia', specialty: 'Ginecologia', password: '123', color: '#06b6d4' },
-                { id: '4', name: 'Claudia', specialty: 'Clínica Geral', password: '123', color: '#10b981' }
-            ];
-            state.appointments = JSON.parse(localStorage.getItem('hc_appointments')) || [
-                { id: '101', patientId: '1', professionalId: '1', date: formatDateISO(new Date()), time: '08:00', duration: 45, status: 'present' },
-                { id: '102', patientId: '2', professionalId: '2', date: formatDateISO(new Date()), time: '09:00', duration: 45, status: 'scheduled' },
-                { id: '103', patientId: '1', professionalId: '3', date: formatDateISO(new Date()), time: '13:00', duration: 60, status: 'scheduled' },
-                { id: '104', patientId: '2', professionalId: '4', date: formatDateISO(new Date()), time: '14:00', duration: 60, status: 'scheduled' },
-                { id: '105', patientId: '1', professionalId: '1', date: formatDateISO(new Date()), time: '16:00', duration: 45, recurring: true, recurringType: 'weekly', status: 'scheduled' }
-            ];
+            migrateOldData();
+            
+            state.clinics = JSON.parse(localStorage.getItem('hc_clinics')) || [];
+            
+            if (state.currentClinicId) {
+                const prefix = `hc_${state.currentClinicId}_`;
+                state.patients = JSON.parse(localStorage.getItem(prefix + 'patients')) || [];
+                state.professionals = JSON.parse(localStorage.getItem(prefix + 'professionals')) || [];
+                state.appointments = JSON.parse(localStorage.getItem(prefix + 'appointments')) || [];
+            } else {
+                state.patients = [];
+                state.professionals = [];
+                state.appointments = [];
+            }
         } catch (e) {
             console.error("Erro ao carregar dados", e);
         }
     };
 
     const saveData = () => {
-        localStorage.setItem('hc_patients', JSON.stringify(state.patients));
-        localStorage.setItem('hc_professionals', JSON.stringify(state.professionals));
-        localStorage.setItem('hc_appointments', JSON.stringify(state.appointments));
+        localStorage.setItem('hc_clinics', JSON.stringify(state.clinics));
+        
+        if (state.currentClinicId) {
+            const prefix = `hc_${state.currentClinicId}_`;
+            localStorage.setItem(prefix + 'patients', JSON.stringify(state.patients));
+            localStorage.setItem(prefix + 'professionals', JSON.stringify(state.professionals));
+            localStorage.setItem(prefix + 'appointments', JSON.stringify(state.appointments));
+        }
     };
 
     // Utils
@@ -139,7 +296,120 @@
             case 'pacientes': renderPacientes(); break;
             case 'profissionais': renderProfissionais(); break;
             case 'relatorios': renderRelatorios(); break;
+            case 'super-admin': renderSuperAdmin(); break;
         }
+    };
+
+    const renderSuperAdmin = () => {
+        elements.viewTitle.innerText = 'Painel Super Admin';
+        elements.viewContent.innerHTML = `
+            <div class="card" style="background: white; padding: 24px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 20px;">
+                    <h3>Gestão de Clínicas</h3>
+                    <button class="btn-primary" id="newClinicBtn"><i class="fas fa-plus"></i> Nova Clínica</button>
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 16px;">
+                    ${state.clinics.map(c => `
+                        <div class="clinic-card">
+                            <div class="clinic-info">
+                                <h4>${c.name}</h4>
+                                <p><i class="fas fa-map-marker-alt"></i> ${c.address || 'Sem endereço'}</p>
+                                <p><i class="fas fa-id-badge"></i> ID: ${c.id}</p>
+                            </div>
+                            <div class="clinic-actions">
+                                <button class="btn-secondary copy-link-btn" data-id="${c.id}" title="Copiar Link Único"><i class="fas fa-link"></i></button>
+                                <button class="btn-secondary manage-clinic-btn" data-id="${c.id}" title="Gerenciar"><i class="fas fa-sign-in-alt"></i></button>
+                                <button class="btn-secondary edit-clinic-btn" data-id="${c.id}" title="Editar"><i class="fas fa-edit"></i></button>
+                                <button class="btn-secondary delete-clinic-btn" data-id="${c.id}" title="Excluir" style="color: #ef4444;"><i class="fas fa-trash"></i></button>
+                            </div>
+                        </div>
+                    `).join('')}
+                    ${state.clinics.length === 0 ? '<p style="text-align: center; color: var(--text-muted); padding: 20px;">Nenhuma clínica cadastrada.</p>' : ''}
+                </div>
+            </div>
+        `;
+
+        document.querySelectorAll('.copy-link-btn').forEach(btn => {
+            btn.onclick = () => {
+                const id = btn.dataset.id;
+                const url = new URL(window.location.href);
+                url.searchParams.set('clinic', id);
+                navigator.clipboard.writeText(url.toString()).then(() => {
+                    alert('Link único copiado para a área de transferência!');
+                });
+            };
+        });
+
+        document.getElementById('newClinicBtn').onclick = () => {
+            elements.modalTitle.innerText = 'Nova Clínica';
+            elements.modalBody.innerHTML = `
+                <form id="clinicForm">
+                    <div class="form-group"><label>Nome da Clínica</label><input type="text" id="cName" required></div>
+                    <div class="form-group"><label>Endereço</label><input type="text" id="cAddress" required></div>
+                    <button type="submit" class="btn-primary" style="width: 100%; justify-content: center;">Salvar Clínica</button>
+                </form>
+            `;
+            elements.modalOverlay.classList.remove('hidden');
+            document.getElementById('clinicForm').onsubmit = (e) => {
+                e.preventDefault();
+                const newClinic = {
+                    id: 'clinic_' + Date.now(),
+                    name: document.getElementById('cName').value,
+                    address: document.getElementById('cAddress').value
+                };
+                state.clinics.push(newClinic);
+                saveData();
+                elements.modalOverlay.classList.add('hidden');
+                renderSuperAdmin();
+            };
+        };
+
+        document.querySelectorAll('.manage-clinic-btn').forEach(btn => {
+            btn.onclick = () => {
+                state.currentClinicId = btn.dataset.id;
+                state.currentUser.role = 'admin'; // Act as admin of this clinic
+                loadData();
+                finishLogin();
+            };
+        });
+
+        document.querySelectorAll('.edit-clinic-btn').forEach(btn => {
+            btn.onclick = () => {
+                const clinic = state.clinics.find(c => c.id === btn.dataset.id);
+                elements.modalTitle.innerText = 'Editar Clínica';
+                elements.modalBody.innerHTML = `
+                    <form id="editClinicForm">
+                        <div class="form-group"><label>Nome da Clínica</label><input type="text" id="cName" value="${clinic.name}" required></div>
+                        <div class="form-group"><label>Endereço</label><input type="text" id="cAddress" value="${clinic.address}" required></div>
+                        <button type="submit" class="btn-primary" style="width: 100%; justify-content: center;">Atualizar Clínica</button>
+                    </form>
+                `;
+                elements.modalOverlay.classList.remove('hidden');
+                document.getElementById('editClinicForm').onsubmit = (e) => {
+                    e.preventDefault();
+                    clinic.name = document.getElementById('cName').value;
+                    clinic.address = document.getElementById('cAddress').value;
+                    saveData();
+                    elements.modalOverlay.classList.add('hidden');
+                    renderSuperAdmin();
+                };
+            };
+        });
+
+        document.querySelectorAll('.delete-clinic-btn').forEach(btn => {
+            btn.onclick = () => {
+                if (confirm('ATENÇÃO: Isso excluirá a clínica e TODOS os seus dados permanentemente. Continuar?')) {
+                    const id = btn.dataset.id;
+                    state.clinics = state.clinics.filter(c => c.id !== id);
+                    // Clear clinic data
+                    localStorage.removeItem(`hc_${id}_patients`);
+                    localStorage.removeItem(`hc_${id}_professionals`);
+                    localStorage.removeItem(`hc_${id}_appointments`);
+                    saveData();
+                    renderSuperAdmin();
+                }
+            };
+        });
     };
 
     const renderAgenda = () => {
@@ -568,9 +838,15 @@
 
     const updateUserUI = () => {
         elements.userName.innerText = state.currentUser.name;
-        elements.userRole.innerText = state.currentUser.role === 'admin' ? 'Admin Principal' : (state.currentUser.specialty || 'Profissional');
+        elements.userRole.innerText = state.currentUser.role === 'super-admin' ? 'Super Admin' : (state.currentUser.role === 'admin' ? 'Admin Principal' : (state.currentUser.specialty || 'Profissional'));
         elements.userAvatar.innerText = state.currentUser.name.substring(0, 2).toUpperCase();
         
+        // Handle menu visibility
+        const isSuperAdmin = state.currentUser.role === 'super-admin';
+        
+        document.querySelectorAll('.super-admin-only').forEach(el => el.classList.toggle('hidden', !isSuperAdmin));
+        document.querySelectorAll('.admin-only').forEach(el => el.classList.toggle('hidden', isSuperAdmin));
+
         if (state.currentUser.role === 'professional') {
             document.getElementById('app').classList.replace('admin-view', 'professional-view');
         } else {
@@ -604,14 +880,13 @@
 
         loadData();
 
-        // Populate filter
-        elements.professionalFilter.innerHTML = '<option value="all">Todos os Profissionais</option>';
-        state.professionals.forEach(p => {
-            const opt = document.createElement('option');
-            opt.value = p.id;
-            opt.innerText = p.name;
-            elements.professionalFilter.appendChild(opt);
-        });
+        // Check for clinic in URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const urlClinicId = urlParams.get('clinic');
+        if (urlClinicId) {
+            state.currentClinicId = urlClinicId;
+            loadData();
+        }
 
         // Event Listeners
         elements.navLinks.forEach(link => {
@@ -647,6 +922,8 @@
         elements.closeModal.onclick = () => elements.modalOverlay.classList.add('hidden');
         elements.logoutBtn.onclick = () => {
             state.currentUser = null;
+            state.currentClinicId = null; // Reset clinic on logout
+            loadData();
             renderLoginScreen();
         };
 
@@ -655,6 +932,7 @@
         } else {
             document.getElementById('app').classList.remove('hidden');
             updateUserUI();
+            populateProfFilter();
             renderView();
         }
     };
