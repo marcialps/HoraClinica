@@ -13,27 +13,31 @@
 
     // DOM Elements - to be populated on init
     let elements = {};
+    let unsubscribes = []; // For Firebase listeners
 
-    const migrateOldData = () => {
-        const oldPatients = localStorage.getItem('hc_patients');
-        if (oldPatients && !localStorage.getItem('hc_clinics')) {
-            const defaultClinic = {
-                id: 'clinic_' + Date.now(),
-                name: 'Minha Clínica',
-                address: 'Endereço Padrão'
-            };
-            const clinics = [defaultClinic];
-            localStorage.setItem('hc_clinics', JSON.stringify(clinics));
-            
-            // Move data
-            localStorage.setItem(`hc_${defaultClinic.id}_patients`, oldPatients);
-            localStorage.setItem(`hc_${defaultClinic.id}_professionals`, localStorage.getItem('hc_professionals') || '[]');
-            localStorage.setItem(`hc_${defaultClinic.id}_appointments`, localStorage.getItem('hc_appointments') || '[]');
-            
-            // Clear old keys
-            localStorage.removeItem('hc_patients');
-            localStorage.removeItem('hc_professionals');
-            localStorage.removeItem('hc_appointments');
+    const migrateToFirebase = async () => {
+        const localClinics = JSON.parse(localStorage.getItem('hc_clinics'));
+        if (localClinics && localClinics.length > 0) {
+            console.log("Migrando dados locais para o Firebase...");
+            for (const clinic of localClinics) {
+                // Save clinic
+                await db.collection('clinics').doc(clinic.id).set(clinic);
+                
+                // Migrate patients
+                const patients = JSON.parse(localStorage.getItem(`hc_${clinic.id}_patients`)) || [];
+                for (const p of patients) await db.collection('clinics').doc(clinic.id).collection('patients').doc(p.id).set(p);
+
+                // Migrate professionals
+                const professionals = JSON.parse(localStorage.getItem(`hc_${clinic.id}_professionals`)) || [];
+                for (const p of professionals) await db.collection('clinics').doc(clinic.id).collection('professionals').doc(p.id).set(p);
+
+                // Migrate appointments
+                const appointments = JSON.parse(localStorage.getItem(`hc_${clinic.id}_appointments`)) || [];
+                for (const a of appointments) await db.collection('clinics').doc(clinic.id).collection('appointments').doc(a.id).set(a);
+            }
+            // Clear local storage after migration
+            localStorage.clear();
+            console.log("Migração concluída com sucesso!");
         }
     };
 
@@ -185,7 +189,7 @@
             const id = e.target.value;
             if (id) {
                 state.currentClinicId = id;
-                loadData();
+                setupListeners(); // Re-setup for new clinic
                 renderLoginScreen();
             }
         };
@@ -271,36 +275,78 @@
         });
     };
 
-    // Load Data
-    const loadData = () => {
-        try {
-            migrateOldData();
-            
-            state.clinics = JSON.parse(localStorage.getItem('hc_clinics')) || [];
-            
-            if (state.currentClinicId) {
-                const prefix = `hc_${state.currentClinicId}_`;
-                state.patients = JSON.parse(localStorage.getItem(prefix + 'patients')) || [];
-                state.professionals = JSON.parse(localStorage.getItem(prefix + 'professionals')) || [];
-                state.appointments = JSON.parse(localStorage.getItem(prefix + 'appointments')) || [];
-            } else {
-                state.patients = [];
-                state.professionals = [];
-                state.appointments = [];
+    // Load Data (Firebase Real-time)
+    const setupListeners = () => {
+        // Clear previous listeners
+        unsubscribes.forEach(unsub => unsub());
+        unsubscribes = [];
+
+        // 1. Clinics Listener (Always active)
+        const unsubClinics = db.collection('clinics').onSnapshot(snapshot => {
+            state.clinics = snapshot.docs.map(doc => doc.data());
+            if (state.currentUser && state.currentUser.role === 'super-admin') {
+                renderSuperAdmin();
             }
-        } catch (e) {
-            console.error("Erro ao carregar dados", e);
+            // Refresh login if no clinic found yet
+            if (!state.currentUser && !state.currentClinicId) {
+                renderLoginScreen();
+            }
+        });
+        unsubscribes.push(unsubClinics);
+
+        // 2. Clinic Data Listeners (Only if clinic selected)
+        if (state.currentClinicId) {
+            const clinicRef = db.collection('clinics').doc(state.currentClinicId);
+
+            const unsubPatients = clinicRef.collection('patients').onSnapshot(snapshot => {
+                state.patients = snapshot.docs.map(doc => doc.data());
+                if (state.currentUser) renderView();
+            });
+            unsubscribes.push(unsubPatients);
+
+            const unsubProfs = clinicRef.collection('professionals').onSnapshot(snapshot => {
+                state.professionals = snapshot.docs.map(doc => doc.data());
+                if (state.currentUser) {
+                    populateProfFilter();
+                    renderView();
+                }
+            });
+            unsubscribes.push(unsubProfs);
+
+            const unsubApps = clinicRef.collection('appointments').onSnapshot(snapshot => {
+                state.appointments = snapshot.docs.map(doc => doc.data());
+                if (state.currentUser) renderView();
+            });
+            unsubscribes.push(unsubApps);
         }
     };
 
-    const saveData = () => {
-        localStorage.setItem('hc_clinics', JSON.stringify(state.clinics));
+    const saveData = async (collection, data) => {
+        if (!state.currentClinicId && collection !== 'clinics') return;
         
-        if (state.currentClinicId) {
-            const prefix = `hc_${state.currentClinicId}_`;
-            localStorage.setItem(prefix + 'patients', JSON.stringify(state.patients));
-            localStorage.setItem(prefix + 'professionals', JSON.stringify(state.professionals));
-            localStorage.setItem(prefix + 'appointments', JSON.stringify(state.appointments));
+        try {
+            if (collection === 'clinics') {
+                await db.collection('clinics').doc(data.id).set(data);
+            } else {
+                await db.collection('clinics').doc(state.currentClinicId).collection(collection).doc(data.id).set(data);
+            }
+        } catch (e) {
+            console.error("Erro ao salvar no Firebase", e);
+            alert("Erro ao salvar dados na nuvem.");
+        }
+    };
+
+    const deleteData = async (collection, id) => {
+        if (!state.currentClinicId && collection !== 'clinics') return;
+        
+        try {
+            if (collection === 'clinics') {
+                await db.collection('clinics').doc(id).delete();
+            } else {
+                await db.collection('clinics').doc(state.currentClinicId).collection(collection).doc(id).delete();
+            }
+        } catch (e) {
+            console.error("Erro ao excluir no Firebase", e);
         }
     };
 
@@ -409,10 +455,9 @@
                     phone: document.getElementById('cPhone').value,
                     adminPass: document.getElementById('cAdminPass').value
                 };
-                state.clinics.push(newClinic);
-                saveData();
+                await saveData('clinics', newClinic);
                 elements.modalOverlay.classList.add('hidden');
-                renderSuperAdmin();
+                // No need to call renderSuperAdmin manually, the listener will handle it
             };
         };
 
@@ -439,15 +484,14 @@
                     </form>
                 `;
                 elements.modalOverlay.classList.remove('hidden');
-                document.getElementById('editClinicForm').onsubmit = (e) => {
+                document.getElementById('editClinicForm').onsubmit = async (e) => {
                     e.preventDefault();
                     clinic.name = document.getElementById('cName').value;
                     clinic.address = document.getElementById('cAddress').value;
                     clinic.phone = document.getElementById('cPhone').value;
                     clinic.adminPass = document.getElementById('cAdminPass').value;
-                    saveData();
+                    await saveData('clinics', clinic);
                     elements.modalOverlay.classList.add('hidden');
-                    renderSuperAdmin();
                 };
             };
         });
@@ -455,14 +499,7 @@
         document.querySelectorAll('.delete-clinic-btn').forEach(btn => {
             btn.onclick = () => {
                 if (confirm('ATENÇÃO: Isso excluirá a clínica e TODOS os seus dados permanentemente. Continuar?')) {
-                    const id = btn.dataset.id;
-                    state.clinics = state.clinics.filter(c => c.id !== id);
-                    // Clear clinic data
-                    localStorage.removeItem(`hc_${id}_patients`);
-                    localStorage.removeItem(`hc_${id}_professionals`);
-                    localStorage.removeItem(`hc_${id}_appointments`);
-                    saveData();
-                    renderSuperAdmin();
+                    deleteData('clinics', btn.dataset.id);
                 }
             };
         });
@@ -614,10 +651,8 @@
                 recurringType: document.getElementById('appRecurring').value,
                 status: 'scheduled'
             };
-            state.appointments.push(newApp);
-            saveData();
+            await saveData('appointments', newApp);
             elements.modalOverlay.classList.add('hidden');
-            renderAgenda();
         };
     };
 
@@ -643,27 +678,22 @@
         
         elements.modalOverlay.classList.remove('hidden');
         
-        document.getElementById('markPresent').onclick = () => {
+        document.getElementById('markPresent').onclick = async () => {
             app.status = 'present';
-            saveData();
+            await saveData('appointments', app);
             elements.modalOverlay.classList.add('hidden');
-            renderAgenda();
         };
 
-        document.getElementById('markAbsent').onclick = () => {
+        document.getElementById('markAbsent').onclick = async () => {
             app.status = 'absent';
-            saveData();
+            await saveData('appointments', app);
             elements.modalOverlay.classList.add('hidden');
-            renderAgenda();
         };
         
-        const deleteBtn = document.getElementById('deleteApp');
         if (deleteBtn) {
-            deleteBtn.onclick = () => {
-                state.appointments = state.appointments.filter(a => a.id !== app.id);
-                saveData();
+            deleteBtn.onclick = async () => {
+                await deleteData('appointments', app.id);
                 elements.modalOverlay.classList.add('hidden');
-                renderAgenda();
             };
         }
     };
@@ -692,12 +722,11 @@
                 </form>
             `;
             elements.modalOverlay.classList.remove('hidden');
-            document.getElementById('patientForm').onsubmit = (e) => {
+            document.getElementById('patientForm').onsubmit = async (e) => {
                 e.preventDefault();
-                state.patients.push({ id: Date.now().toString(), name: document.getElementById('pName').value, phone: document.getElementById('pPhone').value });
-                saveData();
+                const p = { id: Date.now().toString(), name: document.getElementById('pName').value, phone: document.getElementById('pPhone').value };
+                await saveData('patients', p);
                 elements.modalOverlay.classList.add('hidden');
-                renderPacientes();
             };
         };
 
@@ -714,24 +743,21 @@
                         </form>
                     `;
                     elements.modalOverlay.classList.remove('hidden');
-                    document.getElementById('editPatientForm').onsubmit = (e) => {
+                    document.getElementById('editPatientForm').onsubmit = async (e) => {
                         e.preventDefault();
                         patient.name = document.getElementById('pName').value;
                         patient.phone = document.getElementById('pPhone').value;
-                        saveData();
+                        await saveData('patients', patient);
                         elements.modalOverlay.classList.add('hidden');
-                        renderPacientes();
                     };
                 }
             };
         });
 
         document.querySelectorAll('.delete-patient-btn').forEach(btn => {
-            btn.onclick = () => {
+            btn.onclick = async () => {
                 if (confirm('Tem certeza que deseja excluir este paciente?')) {
-                    state.patients = state.patients.filter(p => p.id !== btn.dataset.id);
-                    saveData();
-                    renderPacientes();
+                    await deleteData('patients', btn.dataset.id);
                 }
             };
         });
@@ -772,18 +798,17 @@
                 </form>
             `;
             elements.modalOverlay.classList.remove('hidden');
-            document.getElementById('profForm').onsubmit = (e) => {
+            document.getElementById('profForm').onsubmit = async (e) => {
                 e.preventDefault();
-                state.professionals.push({ 
+                const p = { 
                     id: Date.now().toString(), 
                     name: document.getElementById('prName').value, 
                     specialty: document.getElementById('prSpec').value, 
                     password: document.getElementById('prPass').value,
                     color: '#'+Math.floor(Math.random()*16777215).toString(16) 
-                });
-                saveData();
+                };
+                await saveData('professionals', p);
                 elements.modalOverlay.classList.add('hidden');
-                renderProfissionais();
             };
         };
 
@@ -801,26 +826,22 @@
                         </form>
                     `;
                     elements.modalOverlay.classList.remove('hidden');
-                    document.getElementById('editProfForm').onsubmit = (e) => {
+                    document.getElementById('editProfForm').onsubmit = async (e) => {
                         e.preventDefault();
                         prof.name = document.getElementById('prName').value;
                         prof.specialty = document.getElementById('prSpec').value;
                         prof.password = document.getElementById('prPass').value;
-                        saveData();
+                        await saveData('professionals', prof);
                         elements.modalOverlay.classList.add('hidden');
-                        renderProfissionais();
                     };
                 }
             };
         });
 
         document.querySelectorAll('.delete-prof-btn').forEach(btn => {
-            btn.onclick = () => {
+            btn.onclick = async () => {
                 if (confirm('Tem certeza que deseja excluir este profissional? Isso também removerá seus agendamentos.')) {
-                    state.professionals = state.professionals.filter(p => p.id !== btn.dataset.id);
-                    state.appointments = state.appointments.filter(a => a.professionalId !== btn.dataset.id);
-                    saveData();
-                    renderProfissionais();
+                    await deleteData('professionals', btn.dataset.id);
                 }
             };
         });
@@ -910,7 +931,7 @@
         }
     };
 
-    const init = () => {
+    const init = async () => {
         // Map elements
         elements = {
             app: document.getElementById('app'),
@@ -934,19 +955,16 @@
             logoutBtn: document.getElementById('logoutBtn')
         };
 
-        // 1. Detect Clinic from URL immediately (search or hash)
+        // 1. Detect Clinic from URL immediately
         const urlParams = new URLSearchParams(window.location.search || window.location.hash.substring(window.location.hash.indexOf('?')));
         const urlClinicId = urlParams.get('clinic');
         if (urlClinicId) {
             state.currentClinicId = urlClinicId;
         }
 
-        loadData();
-
-        // Check if detected clinic from URL exists in state, if not, try one more loadData
-        if (state.currentClinicId && !state.clinics.find(c => c.id === state.currentClinicId)) {
-            loadData();
-        }
+        // 2. Migration and Initial Listeners
+        await migrateToFirebase();
+        setupListeners();
 
         // Event Listeners
         elements.navLinks.forEach(link => {
@@ -970,7 +988,6 @@
 
         elements.hiddenDatePicker.onchange = (e) => {
             if (e.target.value) {
-                // Adjust for timezone offset to ensure the date is correct
                 const [y, m, d] = e.target.value.split('-').map(Number);
                 state.currentDate = new Date(y, m - 1, d);
                 renderView();
@@ -982,8 +999,8 @@
         elements.closeModal.onclick = () => elements.modalOverlay.classList.add('hidden');
         elements.logoutBtn.onclick = () => {
             state.currentUser = null;
-            state.currentClinicId = null; // Reset clinic on logout
-            loadData();
+            state.currentClinicId = null;
+            setupListeners(); // Re-setup as public
             renderLoginScreen();
         };
 
@@ -991,6 +1008,7 @@
             renderLoginScreen();
         } else {
             document.getElementById('app').classList.remove('hidden');
+            document.getElementById('landingPage').classList.add('hidden');
             updateUserUI();
             populateProfFilter();
             renderView();
