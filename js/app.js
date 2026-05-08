@@ -4,7 +4,7 @@
         patients: [],
         professionals: [],
         appointments: [],
-        currentDate: new Date(),
+        currentDate: new Date(new Date().setHours(0, 0, 0, 0)),
         currentUser: null, // Start logged out
         currentView: 'agenda'
     };
@@ -83,11 +83,11 @@
                 { id: '4', name: 'Claudia', specialty: 'Clínica Geral', password: '123', color: '#10b981' }
             ];
             state.appointments = JSON.parse(localStorage.getItem('hc_appointments')) || [
-                { id: '101', patientId: '1', professionalId: '1', date: new Date().toISOString().split('T')[0], time: '08:00', duration: 45, status: 'present' },
-                { id: '102', patientId: '2', professionalId: '2', date: new Date().toISOString().split('T')[0], time: '09:00', duration: 45, status: 'scheduled' },
-                { id: '103', patientId: '1', professionalId: '3', date: new Date().toISOString().split('T')[0], time: '13:00', duration: 60, status: 'scheduled' },
-                { id: '104', patientId: '2', professionalId: '4', date: new Date().toISOString().split('T')[0], time: '14:00', duration: 60, status: 'scheduled' },
-                { id: '105', patientId: '1', professionalId: '1', date: new Date().toISOString().split('T')[0], time: '16:00', duration: 45, recurring: true, recurringType: 'weekly', status: 'scheduled' }
+                { id: '101', patientId: '1', professionalId: '1', date: formatDateISO(new Date()), time: '08:00', duration: 45, status: 'present' },
+                { id: '102', patientId: '2', professionalId: '2', date: formatDateISO(new Date()), time: '09:00', duration: 45, status: 'scheduled' },
+                { id: '103', patientId: '1', professionalId: '3', date: formatDateISO(new Date()), time: '13:00', duration: 60, status: 'scheduled' },
+                { id: '104', patientId: '2', professionalId: '4', date: formatDateISO(new Date()), time: '14:00', duration: 60, status: 'scheduled' },
+                { id: '105', patientId: '1', professionalId: '1', date: formatDateISO(new Date()), time: '16:00', duration: 45, recurring: true, recurringType: 'weekly', status: 'scheduled' }
             ];
         } catch (e) {
             console.error("Erro ao carregar dados", e);
@@ -103,6 +103,13 @@
     // Utils
     const formatDate = (date) => {
         return date.toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' });
+    };
+
+    const formatDateISO = (date) => {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
     };
 
     const addMinutes = (time, mins) => {
@@ -193,12 +200,13 @@
     };
 
     const getAppointmentsForDay = (date, profId) => {
-        const dateStr = date.toISOString().split('T')[0];
+        const dateStr = formatDateISO(date);
         return state.appointments.filter(app => {
             if (app.professionalId !== profId) return false;
             if (app.date === dateStr) return true;
             if (app.recurring && app.recurringType === 'weekly') {
-                const appDate = new Date(app.date);
+                const [y, m, d] = app.date.split('-').map(Number);
+                const appDate = new Date(y, m - 1, d);
                 return date >= appDate && date.getDay() === appDate.getDay();
             }
             return false;
@@ -244,7 +252,7 @@
                 </div>
                 <div class="form-group">
                     <label>Data de Início</label>
-                    <input type="date" id="appDate" value="${state.currentDate.toISOString().split('T')[0]}" required>
+                    <input type="date" id="appDate" value="${formatDateISO(state.currentDate)}" required>
                 </div>
                 <div class="form-group">
                     <label>Horário</label>
@@ -621,7 +629,7 @@
         };
 
         elements.todayBtn.onclick = () => {
-            state.currentDate = new Date();
+            state.currentDate = new Date(new Date().setHours(0, 0, 0, 0));
             renderView();
         };
 
