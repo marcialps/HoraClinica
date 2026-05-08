@@ -479,7 +479,7 @@
             btn.onclick = () => {
                 state.currentClinicId = btn.dataset.id;
                 state.currentUser.role = 'admin'; // Act as admin of this clinic
-                loadData();
+                setupListeners();
                 finishLogin();
             };
         });
@@ -704,10 +704,13 @@
             elements.modalOverlay.classList.add('hidden');
         };
         
+        const deleteBtn = document.getElementById('deleteApp');
         if (deleteBtn) {
             deleteBtn.onclick = async () => {
-                await deleteData('appointments', app.id);
-                elements.modalOverlay.classList.add('hidden');
+                if (confirm('Tem certeza que deseja excluir este agendamento?')) {
+                    await deleteData('appointments', app.id);
+                    elements.modalOverlay.classList.add('hidden');
+                }
             };
         }
     };
