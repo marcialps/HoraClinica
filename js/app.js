@@ -284,11 +284,13 @@
         // 1. Clinics Listener (Always active)
         const unsubClinics = db.collection('clinics').onSnapshot(snapshot => {
             state.clinics = snapshot.docs.map(doc => doc.data());
+            
             if (state.currentUser && state.currentUser.role === 'super-admin') {
                 renderSuperAdmin();
             }
-            // Refresh login if no clinic found yet
-            if (!state.currentUser && !state.currentClinicId) {
+            
+            // If we are at the login/landing stage, refresh to catch the clinic from URL or update selector
+            if (!state.currentUser) {
                 renderLoginScreen();
             }
         });
