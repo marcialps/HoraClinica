@@ -774,3 +774,8 @@ h1, h2, h3, .logo span {
     text-decoration: underline;
     filter: brightness(0.8);
 }
+
+.phone-link:hover {
+    color: #128c7e !important;
+    text-decoration: underline;
+}

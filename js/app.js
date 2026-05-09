@@ -392,6 +392,10 @@
         return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
     };
 
+    const cleanPhone = (phone) => {
+        return phone.replace(/\D/g, '');
+    };
+
     // Navigation
     const switchView = (view) => {
         state.currentView = view;
@@ -753,7 +757,12 @@
                                         <div class="patient-name-link" data-id="${p.id}" style="font-weight: 600; color: var(--primary); cursor: pointer;">${p.name}</div>
                                         <div style="font-size: 11px; color: var(--text-muted);">${p.responsible ? `Resp: ${p.responsible}` : ''} ${p.age ? `| ${p.age} anos` : ''}</div>
                                     </td>
-                                    <td style="padding: 12px;">${p.phone}</td>
+                                    <td style="padding: 12px;">
+                                        <a href="https://wa.me/55${cleanPhone(p.phone)}" target="_blank" class="phone-link" style="text-decoration: none; color: inherit; display: flex; align-items: center; gap: 6px;">
+                                            <i class="fab fa-whatsapp" style="color: #25d366;"></i>
+                                            ${p.phone}
+                                        </a>
+                                    </td>
                                     <td style="padding: 12px;">${p.city || '-'}</td>
                                     <td style="padding: 12px;">
                                         <div style="display: flex; flex-wrap: wrap; gap: 4px;">
@@ -937,7 +946,12 @@
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
                     <div class="detail-item">
                         <label style="display: block; font-size: 12px; color: var(--text-muted); margin-bottom: 4px; font-weight: 500;">TELEFONE</label>
-                        <div style="font-weight: 600; color: var(--text-main);"><i class="fas fa-phone" style="width: 20px; color: var(--primary);"></i> ${p.phone}</div>
+                        <div style="font-weight: 600; color: var(--text-main);">
+                            <a href="https://wa.me/55${cleanPhone(p.phone)}" target="_blank" class="phone-link" style="text-decoration: none; color: inherit; display: flex; align-items: center; gap: 8px;">
+                                <i class="fab fa-whatsapp" style="font-size: 18px; color: #25d366;"></i>
+                                ${p.phone}
+                            </a>
+                        </div>
                     </div>
                     <div class="detail-item">
                         <label style="display: block; font-size: 12px; color: var(--text-muted); margin-bottom: 4px; font-weight: 500;">RESPONSÁVEL</label>
