@@ -524,6 +524,11 @@
         elements.viewTitle.innerText = 'Agenda do Dia';
         elements.currentDateDisplay.innerText = formatDate(state.currentDate);
         
+        // Sync hidden date picker value
+        if (elements.hiddenDatePicker) {
+            elements.hiddenDatePicker.value = formatDateISO(state.currentDate);
+        }
+        
         const grid = document.createElement('div');
         grid.className = 'agenda-grid';
         
@@ -1019,6 +1024,18 @@
                     renderView();
                 }
             };
+
+            // Allow clicking the date display area to open the picker
+            const dateWrapper = document.querySelector('.date-input-wrapper');
+            if (dateWrapper) {
+                dateWrapper.onclick = () => {
+                    if (typeof elements.hiddenDatePicker.showPicker === 'function') {
+                        elements.hiddenDatePicker.showPicker();
+                    } else {
+                        elements.hiddenDatePicker.click();
+                    }
+                };
+            }
 
             elements.professionalFilter.onchange = () => renderView();
             elements.addAppointmentBtn.onclick = () => openNewAppointmentModal();
