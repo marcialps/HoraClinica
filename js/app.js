@@ -756,9 +756,13 @@
                                     <td style="padding: 12px;">${p.phone}</td>
                                     <td style="padding: 12px;">${p.city || '-'}</td>
                                     <td style="padding: 12px;">
-                                        <span class="badge-insurance" style="background: ${p.insurance === 'Particular' ? '#f1f5f9' : '#dbeafe'}; color: ${p.insurance === 'Particular' ? '#64748b' : '#2563eb'}; padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: 600;">
-                                            ${p.insurance || 'Particular'}
-                                        </span>
+                                        <div style="display: flex; flex-wrap: wrap; gap: 4px;">
+                                            ${(Array.isArray(p.insurance) ? p.insurance : [p.insurance || 'Particular']).map(ins => `
+                                                <span class="badge-insurance" style="background: ${ins === 'Particular' ? '#f1f5f9' : '#dbeafe'}; color: ${ins === 'Particular' ? '#64748b' : '#2563eb'}; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 600;">
+                                                    ${ins}
+                                                </span>
+                                            `).join('')}
+                                        </div>
                                     </td>
                                     <td style="padding: 12px;">
                                         <button class="edit-btn" data-id="${p.id}" title="Editar" style="background: none; border: none; color: #64748b; cursor: pointer; margin-right: 8px;"><i class="fas fa-edit"></i></button>
@@ -772,13 +776,16 @@
             </div>
         `;
         
-        const getInsuranceHTML = (selectedInsurance) => {
+        const getInsuranceHTML = (selectedInsurances = []) => {
+            if (!Array.isArray(selectedInsurances)) selectedInsurances = [selectedInsurances];
+            if (selectedInsurances.length === 0) selectedInsurances = ['Particular'];
+
             const insurances = ['Particular', ...state.insurances.map(i => i.name)];
             return `
                 <div class="insurance-options" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 8px;">
                     ${insurances.map(name => `
                         <label class="checkbox-container" style="display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer; padding: 8px; border: 1px solid var(--border); border-radius: 8px; transition: all 0.2s;">
-                            <input type="radio" name="pInsurance" value="${name}" ${selectedInsurance === name || (name === 'Particular' && !selectedInsurance) ? 'checked' : ''} style="cursor: pointer;">
+                            <input type="checkbox" name="pInsurance" value="${name}" ${selectedInsurances.includes(name) ? 'checked' : ''} style="cursor: pointer;">
                             <span>${name}</span>
                         </label>
                     `).join('')}
@@ -797,13 +804,23 @@
             if (addBtn) {
                 addBtn.onclick = async () => {
                     const name = document.getElementById('newInsuranceName').value.trim();
-                    if (name && !state.insurances.find(i => i.name.toLowerCase() === name.toLowerCase())) {
-                        const newIns = { id: 'ins_' + Date.now(), name: name };
-                        await saveData('insurances', newIns);
-                        document.getElementById('newInsuranceName').value = '';
-                        // The form will re-render if we call the modal again, 
-                        // but since it's inside the modal, we might want to manually add it to the UI or wait for the snapshot
-                        // For simplicity, let's just re-render the modal content
+                    if (name) {
+                        // Check if already in state
+                        if (!state.insurances.find(i => i.name.toLowerCase() === name.toLowerCase())) {
+                            const newIns = { id: 'ins_' + Date.now(), name: name };
+                            await saveData('insurances', newIns);
+                        }
+                        
+                        // Collect currently selected
+                        const selected = Array.from(document.querySelectorAll('input[name="pInsurance"]:checked')).map(cb => cb.value);
+                        if (!selected.includes(name)) selected.push(name);
+                        
+                        // Update UI immediately
+                        const container = document.getElementById('insuranceContainer');
+                        if (container) {
+                            container.innerHTML = getInsuranceHTML(selected);
+                            attachInsuranceLogic(); // Re-attach listener to the new button
+                        }
                     }
                 };
             }
@@ -839,7 +856,7 @@
                     responsible: document.getElementById('pResponsible').value,
                     age: document.getElementById('pAge').value,
                     city: document.getElementById('pCity').value,
-                    insurance: document.querySelector('input[name="pInsurance"]:checked').value
+                    insurance: Array.from(document.querySelectorAll('input[name="pInsurance"]:checked')).map(cb => cb.value)
                 };
                 await saveData('patients', p);
                 elements.modalOverlay.classList.add('hidden');
@@ -877,7 +894,7 @@
                         patient.responsible = document.getElementById('pResponsible').value;
                         patient.age = document.getElementById('pAge').value;
                         patient.city = document.getElementById('pCity').value;
-                        patient.insurance = document.querySelector('input[name="pInsurance"]:checked').value;
+                        patient.insurance = Array.from(document.querySelectorAll('input[name="pInsurance"]:checked')).map(cb => cb.value);
                         await saveData('patients', patient);
                         elements.modalOverlay.classList.add('hidden');
                     };
