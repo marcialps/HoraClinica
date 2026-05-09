@@ -8,7 +8,8 @@
         appointments: [],
         currentDate: new Date(new Date().setHours(0, 0, 0, 0)),
         currentUser: null, // Start logged out
-        currentView: 'agenda'
+        currentView: 'agenda',
+        insurances: []
     };
 
     // DOM Elements - to be populated on init
@@ -333,6 +334,12 @@
                 }
             });
             unsubscribes.push(unsubApps);
+            
+            const unsubInsurances = clinicRef.collection('insurances').onSnapshot(snapshot => {
+                state.insurances = snapshot.docs.map(doc => doc.data());
+                if (state.currentUser && state.currentView === 'pacientes') renderPacientes();
+            });
+            unsubscribes.push(unsubInsurances);
         }
     };
 
@@ -728,25 +735,112 @@
                     <h3>Lista de Pacientes</h3>
                     <button class="btn-primary" id="newPatientBtn"><i class="fas fa-plus"></i> Novo Paciente</button>
                 </div>
-                <table style="width: 100%; border-collapse: collapse;">
-                    <thead><tr style="text-align: left; border-bottom: 1px solid #e2e8f0;"><th style="padding: 12px;">Nome</th><th style="padding: 12px;">Telefone</th><th style="padding: 12px;">Ações</th></tr></thead>
-                    <tbody>${state.patients.map(p => `<tr style="border-bottom: 1px solid #f1f5f9;"><td style="padding: 12px;">${p.name}</td><td style="padding: 12px;">${p.phone}</td><td style="padding: 12px;"><button class="edit-btn" data-id="${p.id}" title="Editar" style="background: none; border: none; color: #64748b; cursor: pointer; margin-right: 8px;"><i class="fas fa-edit"></i></button><button class="delete-patient-btn" data-id="${p.id}" title="Excluir" style="background: none; border: none; color: #ef4444; cursor: pointer;"><i class="fas fa-trash"></i></button></td></tr>`).join('')}</tbody>
-                </table>
+                <div style="overflow-x: auto;">
+                    <table style="width: 100%; border-collapse: collapse; min-width: 600px;">
+                        <thead>
+                            <tr style="text-align: left; border-bottom: 1px solid #e2e8f0;">
+                                <th style="padding: 12px;">Nome</th>
+                                <th style="padding: 12px;">Telefone</th>
+                                <th style="padding: 12px;">Cidade</th>
+                                <th style="padding: 12px;">Convênio</th>
+                                <th style="padding: 12px;">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${state.patients.map(p => `
+                                <tr style="border-bottom: 1px solid #f1f5f9;">
+                                    <td style="padding: 12px;">
+                                        <div style="font-weight: 600;">${p.name}</div>
+                                        <div style="font-size: 11px; color: var(--text-muted);">${p.responsible ? `Resp: ${p.responsible}` : ''} ${p.age ? `| ${p.age} anos` : ''}</div>
+                                    </td>
+                                    <td style="padding: 12px;">${p.phone}</td>
+                                    <td style="padding: 12px;">${p.city || '-'}</td>
+                                    <td style="padding: 12px;">
+                                        <span class="badge-insurance" style="background: ${p.insurance === 'Particular' ? '#f1f5f9' : '#dbeafe'}; color: ${p.insurance === 'Particular' ? '#64748b' : '#2563eb'}; padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: 600;">
+                                            ${p.insurance || 'Particular'}
+                                        </span>
+                                    </td>
+                                    <td style="padding: 12px;">
+                                        <button class="edit-btn" data-id="${p.id}" title="Editar" style="background: none; border: none; color: #64748b; cursor: pointer; margin-right: 8px;"><i class="fas fa-edit"></i></button>
+                                        <button class="delete-patient-btn" data-id="${p.id}" title="Excluir" style="background: none; border: none; color: #ef4444; cursor: pointer;"><i class="fas fa-trash"></i></button>
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
             </div>
         `;
+        
+        const getInsuranceHTML = (selectedInsurance) => {
+            const insurances = ['Particular', ...state.insurances.map(i => i.name)];
+            return `
+                <div class="insurance-options" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 8px;">
+                    ${insurances.map(name => `
+                        <label class="checkbox-container" style="display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer; padding: 8px; border: 1px solid var(--border); border-radius: 8px; transition: all 0.2s;">
+                            <input type="radio" name="pInsurance" value="${name}" ${selectedInsurance === name || (name === 'Particular' && !selectedInsurance) ? 'checked' : ''} style="cursor: pointer;">
+                            <span>${name}</span>
+                        </label>
+                    `).join('')}
+                </div>
+                <div style="margin-top: 12px;">
+                    <div style="display: flex; gap: 8px;">
+                        <input type="text" id="newInsuranceName" placeholder="Novo convênio..." style="flex: 1; padding: 8px; border-radius: 6px; border: 1px solid var(--border); font-size: 13px;">
+                        <button type="button" id="addInsuranceBtn" class="btn-secondary" style="padding: 8px 12px; margin: 0; font-size: 12px;"><i class="fas fa-plus"></i></button>
+                    </div>
+                </div>
+            `;
+        };
+
+        const attachInsuranceLogic = () => {
+            const addBtn = document.getElementById('addInsuranceBtn');
+            if (addBtn) {
+                addBtn.onclick = async () => {
+                    const name = document.getElementById('newInsuranceName').value.trim();
+                    if (name && !state.insurances.find(i => i.name.toLowerCase() === name.toLowerCase())) {
+                        const newIns = { id: 'ins_' + Date.now(), name: name };
+                        await saveData('insurances', newIns);
+                        document.getElementById('newInsuranceName').value = '';
+                        // The form will re-render if we call the modal again, 
+                        // but since it's inside the modal, we might want to manually add it to the UI or wait for the snapshot
+                        // For simplicity, let's just re-render the modal content
+                    }
+                };
+            }
+        };
+
         document.getElementById('newPatientBtn').onclick = () => {
             elements.modalTitle.innerText = 'Novo Paciente';
             elements.modalBody.innerHTML = `
                 <form id="patientForm">
-                    <div class="form-group"><label>Nome Completo</label><input type="text" id="pName" required></div>
-                    <div class="form-group"><label>Telefone</label><input type="text" id="pPhone" required></div>
-                    <button type="submit" class="btn-primary" style="width: 100%; justify-content: center;">Salvar Paciente</button>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                        <div class="form-group" style="grid-column: span 2;"><label>Nome Completo</label><input type="text" id="pName" required></div>
+                        <div class="form-group"><label>Telefone</label><input type="text" id="pPhone" required></div>
+                        <div class="form-group"><label>Responsável</label><input type="text" id="pResponsible"></div>
+                        <div class="form-group"><label>Idade</label><input type="number" id="pAge"></div>
+                        <div class="form-group"><label>Cidade</label><input type="text" id="pCity"></div>
+                    </div>
+                    <div class="form-group">
+                        <label>Convênio</label>
+                        <div id="insuranceContainer">${getInsuranceHTML('Particular')}</div>
+                    </div>
+                    <button type="submit" class="btn-primary" style="width: 100%; justify-content: center; margin-top: 20px;">Salvar Paciente</button>
                 </form>
             `;
             elements.modalOverlay.classList.remove('hidden');
+            attachInsuranceLogic();
+
             document.getElementById('patientForm').onsubmit = async (e) => {
                 e.preventDefault();
-                const p = { id: Date.now().toString(), name: document.getElementById('pName').value, phone: document.getElementById('pPhone').value };
+                const p = { 
+                    id: Date.now().toString(), 
+                    name: document.getElementById('pName').value, 
+                    phone: document.getElementById('pPhone').value,
+                    responsible: document.getElementById('pResponsible').value,
+                    age: document.getElementById('pAge').value,
+                    city: document.getElementById('pCity').value,
+                    insurance: document.querySelector('input[name="pInsurance"]:checked').value
+                };
                 await saveData('patients', p);
                 elements.modalOverlay.classList.add('hidden');
             };
@@ -759,16 +853,31 @@
                     elements.modalTitle.innerText = 'Editar Paciente';
                     elements.modalBody.innerHTML = `
                         <form id="editPatientForm">
-                            <div class="form-group"><label>Nome Completo</label><input type="text" id="pName" value="${patient.name}" required></div>
-                            <div class="form-group"><label>Telefone</label><input type="text" id="pPhone" value="${patient.phone}" required></div>
-                            <button type="submit" class="btn-primary" style="width: 100%; justify-content: center;">Atualizar Paciente</button>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                                <div class="form-group" style="grid-column: span 2;"><label>Nome Completo</label><input type="text" id="pName" value="${patient.name}" required></div>
+                                <div class="form-group"><label>Telefone</label><input type="text" id="pPhone" value="${patient.phone}" required></div>
+                                <div class="form-group"><label>Responsável</label><input type="text" id="pResponsible" value="${patient.responsible || ''}"></div>
+                                <div class="form-group"><label>Idade</label><input type="number" id="pAge" value="${patient.age || ''}"></div>
+                                <div class="form-group"><label>Cidade</label><input type="text" id="pCity" value="${patient.city || ''}"></div>
+                            </div>
+                            <div class="form-group">
+                                <label>Convênio</label>
+                                <div id="insuranceContainer">${getInsuranceHTML(patient.insurance || 'Particular')}</div>
+                            </div>
+                            <button type="submit" class="btn-primary" style="width: 100%; justify-content: center; margin-top: 20px;">Atualizar Paciente</button>
                         </form>
                     `;
                     elements.modalOverlay.classList.remove('hidden');
+                    attachInsuranceLogic();
+
                     document.getElementById('editPatientForm').onsubmit = async (e) => {
                         e.preventDefault();
                         patient.name = document.getElementById('pName').value;
                         patient.phone = document.getElementById('pPhone').value;
+                        patient.responsible = document.getElementById('pResponsible').value;
+                        patient.age = document.getElementById('pAge').value;
+                        patient.city = document.getElementById('pCity').value;
+                        patient.insurance = document.querySelector('input[name="pInsurance"]:checked').value;
                         await saveData('patients', patient);
                         elements.modalOverlay.classList.add('hidden');
                     };
