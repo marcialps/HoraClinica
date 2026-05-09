@@ -750,7 +750,7 @@
                             ${state.patients.map(p => `
                                 <tr style="border-bottom: 1px solid #f1f5f9;">
                                     <td style="padding: 12px;">
-                                        <div style="font-weight: 600;">${p.name}</div>
+                                        <div class="patient-name-link" data-id="${p.id}" style="font-weight: 600; color: var(--primary); cursor: pointer;">${p.name}</div>
                                         <div style="font-size: 11px; color: var(--text-muted);">${p.responsible ? `Resp: ${p.responsible}` : ''} ${p.age ? `| ${p.age} anos` : ''}</div>
                                     </td>
                                     <td style="padding: 12px;">${p.phone}</td>
@@ -909,6 +909,76 @@
                 }
             };
         });
+
+        document.querySelectorAll('.patient-name-link').forEach(link => {
+            link.onclick = () => {
+                const patient = state.patients.find(p => p.id === link.dataset.id);
+                if (patient) openPatientDetails(patient);
+            };
+        });
+    };
+
+    const openPatientDetails = (p) => {
+        elements.modalTitle.innerText = 'Dados do Paciente';
+        const insurances = Array.isArray(p.insurance) ? p.insurance : [p.insurance || 'Particular'];
+        
+        elements.modalBody.innerHTML = `
+            <div class="patient-details-view" style="display: flex; flex-direction: column; gap: 20px;">
+                <div style="display: flex; align-items: center; gap: 20px; padding-bottom: 20px; border-bottom: 1px solid var(--border);">
+                    <div style="width: 64px; height: 64px; background: var(--primary-light); color: var(--primary); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 24px; font-weight: bold;">
+                        ${p.name.substring(0, 2).toUpperCase()}
+                    </div>
+                    <div>
+                        <h2 style="font-size: 20px; margin: 0; color: var(--text-main);">${p.name}</h2>
+                        <p style="margin: 4px 0 0; color: var(--text-muted); font-size: 14px;">Paciente cadastrado</p>
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                    <div class="detail-item">
+                        <label style="display: block; font-size: 12px; color: var(--text-muted); margin-bottom: 4px; font-weight: 500;">TELEFONE</label>
+                        <div style="font-weight: 600; color: var(--text-main);"><i class="fas fa-phone" style="width: 20px; color: var(--primary);"></i> ${p.phone}</div>
+                    </div>
+                    <div class="detail-item">
+                        <label style="display: block; font-size: 12px; color: var(--text-muted); margin-bottom: 4px; font-weight: 500;">RESPONSÁVEL</label>
+                        <div style="font-weight: 600; color: var(--text-main);"><i class="fas fa-user-friends" style="width: 20px; color: var(--primary);"></i> ${p.responsible || 'O Próprio'}</div>
+                    </div>
+                    <div class="detail-item">
+                        <label style="display: block; font-size: 12px; color: var(--text-muted); margin-bottom: 4px; font-weight: 500;">IDADE</label>
+                        <div style="font-weight: 600; color: var(--text-main);"><i class="fas fa-birthday-cake" style="width: 20px; color: var(--primary);"></i> ${p.age ? `${p.age} anos` : 'Não informada'}</div>
+                    </div>
+                    <div class="detail-item">
+                        <label style="display: block; font-size: 12px; color: var(--text-muted); margin-bottom: 4px; font-weight: 500;">CIDADE</label>
+                        <div style="font-weight: 600; color: var(--text-main);"><i class="fas fa-map-marker-alt" style="width: 20px; color: var(--primary);"></i> ${p.city || 'Não informada'}</div>
+                    </div>
+                </div>
+
+                <div class="detail-item">
+                    <label style="display: block; font-size: 12px; color: var(--text-muted); margin-bottom: 12px; font-weight: 500;">CONVÊNIOS ATIVOS</label>
+                    <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+                        ${insurances.map(ins => `
+                            <div style="background: ${ins === 'Particular' ? '#f8fafc' : '#eff6ff'}; border: 1px solid ${ins === 'Particular' ? '#e2e8f0' : '#bfdbfe'}; padding: 8px 16px; border-radius: 8px; font-weight: 600; color: ${ins === 'Particular' ? '#64748b' : '#1d4ed8'}; font-size: 13px; display: flex; align-items: center; gap: 8px;">
+                                <i class="fas ${ins === 'Particular' ? 'fa-wallet' : 'fa-id-card'}"></i>
+                                ${ins}
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+
+                <div style="margin-top: 10px; padding-top: 20px; border-top: 1px solid var(--border); display: flex; gap: 12px;">
+                    <button id="editFromDetails" class="btn-secondary" style="flex: 1; justify-content: center;"><i class="fas fa-edit"></i> Editar Dados</button>
+                    <button onclick="document.getElementById('modalOverlay').classList.add('hidden')" class="btn-primary" style="flex: 1; justify-content: center;">Fechar</button>
+                </div>
+            </div>
+        `;
+        
+        elements.modalOverlay.classList.remove('hidden');
+
+        document.getElementById('editFromDetails').onclick = () => {
+            // Trigger the existing edit logic
+            const editBtn = document.querySelector(`.edit-btn[data-id="${p.id}"]`);
+            if (editBtn) editBtn.click();
+        };
     };
 
     const renderProfissionais = () => {
