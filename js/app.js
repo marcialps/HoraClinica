@@ -1433,6 +1433,20 @@
         } else {
             document.getElementById('app').classList.replace('professional-view', 'admin-view');
         }
+
+        // Update clinic info in sidebar
+        if (state.currentClinicId) {
+            const clinic = state.clinics.find(c => c.id === state.currentClinicId);
+            if (clinic && elements.sidebarClinic) {
+                elements.sidebarClinic.innerHTML = `
+                    <small>Unidade Ativa</small>
+                    <span title="${clinic.name}">${clinic.name}</span>
+                `;
+                elements.sidebarClinic.classList.remove('hidden');
+            }
+        } else {
+            if (elements.sidebarClinic) elements.sidebarClinic.classList.add('hidden');
+        }
     };
 
     const init = async () => {
@@ -1459,6 +1473,7 @@
                 userRole: document.getElementById('userRole'),
                 userAvatar: document.getElementById('userAvatar'),
                 logoutBtn: document.getElementById('logoutBtn'),
+                sidebarClinic: document.getElementById('sidebarClinic'),
                 zoomOut: document.getElementById('zoomOut'),
                 zoomIn: document.getElementById('zoomIn')
             };
