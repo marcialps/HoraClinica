@@ -44,6 +44,12 @@
     };
 
     const renderLoginScreen = () => {
+        // Recover clinic from URL if state is lost
+        if (!state.currentClinicId) {
+            const urlParams = new URLSearchParams(window.location.search || window.location.hash.substring(window.location.hash.indexOf('?')));
+            state.currentClinicId = urlParams.get('clinic');
+        }
+
         const loginScreen = document.getElementById('loginScreen');
         const app = document.getElementById('app');
         const profList = document.getElementById('profLoginList');
@@ -164,7 +170,11 @@
         backBtn.style = 'background: none; border: none; color: var(--text-muted); font-size: 13px; cursor: pointer; width: 100%; margin-top: 20px; display: flex; align-items: center; justify-content: center; gap: 8px;';
         backBtn.onclick = () => {
             state.currentClinicId = null;
-            window.history.pushState({}, '', window.location.pathname);
+            // Clear clinic from URL
+            const url = new URL(window.location.href);
+            url.searchParams.delete('clinic');
+            window.history.pushState({}, '', url.toString());
+            
             renderLandingPage();
         };
         container.appendChild(backBtn);
@@ -191,6 +201,11 @@
             const id = e.target.value;
             if (id) {
                 state.currentClinicId = id;
+                // Sync URL
+                const url = new URL(window.location.href);
+                url.searchParams.set('clinic', id);
+                window.history.pushState({}, '', url.toString());
+                
                 setupListeners(); // Re-setup for new clinic
                 renderLoginScreen();
             }
@@ -1492,7 +1507,6 @@
             elements.closeModal.onclick = () => elements.modalOverlay.classList.add('hidden');
             elements.logoutBtn.onclick = () => {
                 state.currentUser = null;
-                state.currentClinicId = null;
                 setupListeners();
                 renderLoginScreen();
             };
