@@ -1,4 +1,4 @@
-(function() {
+(function () {
     // State Management
     const state = {
         clinics: [],
@@ -24,7 +24,7 @@
             for (const clinic of localClinics) {
                 // Save clinic
                 await db.collection('clinics').doc(clinic.id).set(clinic);
-                
+
                 // Migrate patients
                 const patients = JSON.parse(localStorage.getItem(`hc_${clinic.id}_patients`)) || [];
                 for (const p of patients) await db.collection('clinics').doc(clinic.id).collection('patients').doc(p.id).set(p);
@@ -54,23 +54,23 @@
         const app = document.getElementById('app');
         const profList = document.getElementById('profLoginList');
         const landingPage = document.getElementById('landingPage');
-        
+
         loginScreen.classList.remove('hidden');
         app.classList.add('hidden');
         landingPage.classList.add('hidden');
 
         // Reset sidebar clinic context
         document.querySelector('.logo span').innerText = 'HoraClinica';
-        
+
         // PRIORITY 1: Clinic ID is present (from URL or previous selection)
         if (state.currentClinicId) {
             const clinic = state.clinics.find(c => c.id === state.currentClinicId);
-            
+
             if (clinic) {
                 document.getElementById('loginWelcome').innerText = `Bem-vindo à ${clinic.name}`;
                 document.getElementById('loginSubtitle').innerText = 'Escolha seu perfil profissional';
                 document.getElementById('clinicLogoArea').innerHTML = `<div style="width: 80px; height: 80px; background: var(--primary); border-radius: 20px; display: flex; align-items: center; justify-content: center; margin: 0 auto; color: white; font-size: 32px; font-weight: bold; box-shadow: 0 10px 20px rgba(37, 99, 235, 0.2);">${clinic.name.substring(0, 1).toUpperCase()}</div>`;
-                
+
                 renderProfessionalList(profList);
             } else {
                 document.getElementById('loginWelcome').innerText = 'Clínica não encontrada';
@@ -79,7 +79,7 @@
                 profList.innerHTML = `<button onclick="window.location.href='index.html'" class="btn-secondary" style="width: 100%; justify-content: center; margin-top: 20px;">Voltar para o Início</button>`;
                 document.getElementById('loginAdmin').classList.add('hidden');
             }
-        } 
+        }
         // PRIORITY 2: No clinic ID but clinics exist
         else if (state.clinics.length > 0) {
             document.getElementById('loginWelcome').innerText = 'Bem-vindo ao HoraClinica';
@@ -110,7 +110,7 @@
                 </form>
             `;
             elements.modalOverlay.classList.remove('hidden');
-            
+
             document.getElementById('superAdminForm').onsubmit = (e) => {
                 e.preventDefault();
                 const pass = document.getElementById('superPass').value;
@@ -148,7 +148,7 @@
                     </form>
                 `;
                 elements.modalOverlay.classList.remove('hidden');
-                
+
                 document.getElementById('profLoginForm').onsubmit = (e) => {
                     e.preventDefault();
                     const pass = document.getElementById('loginPass').value;
@@ -174,7 +174,7 @@
             const url = new URL(window.location.href);
             url.searchParams.delete('clinic');
             window.history.pushState({}, '', url.toString());
-            
+
             renderLandingPage();
         };
         container.appendChild(backBtn);
@@ -205,7 +205,7 @@
                 const url = new URL(window.location.href);
                 url.searchParams.set('clinic', id);
                 window.history.pushState({}, '', url.toString());
-                
+
                 setupListeners(); // Re-setup for new clinic
                 renderLoginScreen();
             }
@@ -251,7 +251,7 @@
         document.getElementById('landingPage').classList.remove('hidden');
         document.getElementById('loginScreen').classList.add('hidden');
         document.getElementById('app').classList.add('hidden');
-        
+
         document.getElementById('startNow').onclick = () => {
             if (state.clinics.length > 0) {
                 renderLoginScreen();
@@ -270,7 +270,7 @@
         document.getElementById('landingPage').classList.add('hidden');
         document.getElementById('app').classList.remove('hidden');
         updateUserUI();
-        
+
         if (state.currentUser.role === 'super-admin') {
             switchView('super-admin');
         } else {
@@ -301,15 +301,15 @@
         // 1. Clinics Listener (Always active)
         const unsubClinics = db.collection('clinics').onSnapshot(snapshot => {
             state.clinics = snapshot.docs.map(doc => doc.data());
-            
+
             if (state.currentUser && state.currentUser.role === 'super-admin') {
                 renderSuperAdmin();
             }
-            
+
             // If we are at the login/landing stage
             if (!state.currentUser) {
                 const landingVisible = !document.getElementById('landingPage').classList.contains('hidden');
-                
+
                 // Only auto-switch to login screen if:
                 // 1. We have a specific clinic in the URL
                 // 2. OR we are already in the login screen (not landing)
@@ -350,7 +350,7 @@
                 }
             });
             unsubscribes.push(unsubApps);
-            
+
             const unsubInsurances = clinicRef.collection('insurances').onSnapshot(snapshot => {
                 state.insurances = snapshot.docs.map(doc => doc.data());
                 if (state.currentUser && state.currentView === 'pacientes') renderPacientes();
@@ -361,7 +361,7 @@
 
     const saveData = async (collection, data) => {
         if (!state.currentClinicId && collection !== 'clinics') return;
-        
+
         try {
             if (collection === 'clinics') {
                 await db.collection('clinics').doc(data.id).set(data);
@@ -376,7 +376,7 @@
 
     const deleteData = async (collection, id) => {
         if (!state.currentClinicId && collection !== 'clinics') return;
-        
+
         try {
             if (collection === 'clinics') {
                 await db.collection('clinics').doc(id).delete();
@@ -425,8 +425,8 @@
     const renderView = () => {
         if (!elements.viewContent) return;
         elements.viewContent.innerHTML = '';
-        
-        switch(state.currentView) {
+
+        switch (state.currentView) {
             case 'agenda': renderAgenda(); break;
             case 'pacientes': renderPacientes(); break;
             case 'profissionais': renderProfissionais(); break;
@@ -550,28 +550,28 @@
         elements.viewContent.innerHTML = '';
         elements.viewTitle.innerText = 'Agenda do Dia';
         elements.currentDateDisplay.innerText = formatDate(state.currentDate);
-        
+
         // Sync hidden date picker value
         if (elements.hiddenDatePicker) {
             elements.hiddenDatePicker.value = formatDateISO(state.currentDate);
         }
-        
+
         const grid = document.createElement('div');
         grid.className = 'agenda-grid';
-        
+
         const timeCol = document.createElement('div');
         timeCol.className = 'time-column';
-        for(let h = 7; h <= 18; h++) {
+        for (let h = 7; h <= 18; h++) {
             const slot = document.createElement('div');
             slot.className = 'time-slot';
             slot.innerText = `${h}:00`;
             timeCol.appendChild(slot);
         }
         grid.appendChild(timeCol);
-        
+
         const profsGrid = document.createElement('div');
         profsGrid.className = 'professionals-grid';
-        
+
         const filterVal = elements.professionalFilter.value;
         let filteredProfs = filterVal === 'all' ? state.professionals : state.professionals.filter(p => p.id === filterVal);
 
@@ -585,25 +585,25 @@
         filteredProfs.forEach(prof => {
             const col = document.createElement('div');
             col.className = 'professional-col';
-            
+
             const header = document.createElement('div');
             header.className = 'prof-header';
             header.innerText = prof.name;
             col.appendChild(header);
-            
+
             const container = document.createElement('div');
             container.className = 'appointments-container';
-            
+
             const dayApps = getAppointmentsForDay(state.currentDate, prof.id);
             dayApps.forEach(app => {
                 const card = createAppointmentCard(app);
                 container.appendChild(card);
             });
-            
+
             col.appendChild(container);
             profsGrid.appendChild(col);
         });
-        
+
         grid.appendChild(profsGrid);
         elements.viewContent.appendChild(grid);
     };
@@ -625,20 +625,20 @@
     const createAppointmentCard = (app) => {
         const card = document.createElement('div');
         card.className = `appointment-card ${app.status || ''}`;
-        
+
         const [h, m] = app.time.split(':').map(Number);
         const top = ((h - 7) * 60) + m;
         const height = app.duration || 45;
-        
+
         card.style.top = `${top}px`;
         card.style.height = `${height}px`;
-        
+
         const patient = state.patients.find(p => p.id === app.patientId);
         card.innerHTML = `
             <span class="time">${app.time} - ${addMinutes(app.time, height)}</span>
             <span class="patient">${patient ? patient.name : 'Desconhecido'}</span>
         `;
-        
+
         card.onclick = () => openAppointmentDetails(app);
         return card;
     };
@@ -681,9 +681,9 @@
                 <button type="submit" class="btn-primary" style="width: 100%; justify-content: center;">Salvar Agendamento</button>
             </form>
         `;
-        
+
         elements.modalOverlay.classList.remove('hidden');
-        
+
         document.getElementById('appointmentForm').onsubmit = async (e) => {
             e.preventDefault();
             const newApp = {
@@ -705,7 +705,7 @@
     const openAppointmentDetails = (app) => {
         const patient = state.patients.find(p => p.id === app.patientId);
         const prof = state.professionals.find(p => p.id === app.professionalId);
-        
+
         elements.modalTitle.innerText = 'Detalhes do Agendamento';
         elements.modalBody.innerHTML = `
             <div class="details">
@@ -728,9 +728,9 @@
                 </div>
             </div>
         `;
-        
+
         elements.modalOverlay.classList.remove('hidden');
-        
+
         document.getElementById('markPresent').onclick = async () => {
             app.status = 'present';
             await saveData('appointments', app);
@@ -758,7 +758,7 @@
         document.getElementById('editApp').onclick = () => {
             openEditAppointmentModal(app);
         };
-        
+
         const deleteBtn = document.getElementById('deleteApp');
         if (deleteBtn) {
             deleteBtn.onclick = async () => {
@@ -808,9 +808,9 @@
                 <button type="submit" class="btn-primary" style="width: 100%; justify-content: center;">Salvar Alterações</button>
             </form>
         `;
-        
+
         elements.modalOverlay.classList.remove('hidden');
-        
+
         document.getElementById('editAppointmentForm').onsubmit = async (e) => {
             e.preventDefault();
             app.patientId = document.getElementById('appPatient').value;
@@ -820,7 +820,7 @@
             app.duration = parseInt(document.getElementById('appDuration').value);
             app.recurring = document.getElementById('appRecurring').value !== 'none';
             app.recurringType = document.getElementById('appRecurring').value;
-            
+
             await saveData('appointments', app);
             elements.modalOverlay.classList.add('hidden');
         };
@@ -828,7 +828,7 @@
 
     const renderPacientes = () => {
         elements.viewTitle.innerText = 'Gestão de Pacientes';
-        
+
         const existingSearch = document.getElementById('patientSearch');
         const lastTerm = existingSearch ? existingSearch.value : "";
 
@@ -911,7 +911,7 @@
 
         const renderTableRows = (term = "") => {
             const tbody = document.getElementById('patientTableBody');
-            const filtered = state.patients.filter(p => 
+            const filtered = state.patients.filter(p =>
                 p.name.toLowerCase().includes(term.toLowerCase()) ||
                 (p.responsible && p.responsible.toLowerCase().includes(term.toLowerCase())) ||
                 (p.phone && p.phone.includes(term)) ||
@@ -1028,9 +1028,9 @@
             attachInsuranceLogic();
             document.getElementById('patientForm').onsubmit = async (e) => {
                 e.preventDefault();
-                const p = { 
-                    id: Date.now().toString(), 
-                    name: document.getElementById('pName').value, 
+                const p = {
+                    id: Date.now().toString(),
+                    name: document.getElementById('pName').value,
                     phone: document.getElementById('pPhone').value,
                     responsible: document.getElementById('pResponsible').value,
                     age: document.getElementById('pAge').value,
@@ -1046,7 +1046,7 @@
     const openPatientDetails = (p) => {
         elements.modalTitle.innerText = 'Dados do Paciente';
         const insurances = Array.isArray(p.insurance) ? p.insurance : [p.insurance || 'Particular'];
-        
+
         elements.modalBody.innerHTML = `
             <div class="patient-details-view" style="display: flex; flex-direction: column; gap: 20px;">
                 <div style="display: flex; align-items: center; gap: 20px; padding-bottom: 20px; border-bottom: 1px solid var(--border);">
@@ -1101,7 +1101,7 @@
                 </div>
             </div>
         `;
-        
+
         elements.modalOverlay.classList.remove('hidden');
 
         document.getElementById('editFromDetails').onclick = () => {
@@ -1148,12 +1148,12 @@
             elements.modalOverlay.classList.remove('hidden');
             document.getElementById('profForm').onsubmit = async (e) => {
                 e.preventDefault();
-                const p = { 
-                    id: Date.now().toString(), 
-                    name: document.getElementById('prName').value, 
-                    specialty: document.getElementById('prSpec').value, 
+                const p = {
+                    id: Date.now().toString(),
+                    name: document.getElementById('prName').value,
+                    specialty: document.getElementById('prSpec').value,
                     password: document.getElementById('prPass').value,
-                    color: '#'+Math.floor(Math.random()*16777215).toString(16) 
+                    color: '#' + Math.floor(Math.random() * 16777215).toString(16)
                 };
                 await saveData('professionals', p);
                 elements.modalOverlay.classList.add('hidden');
@@ -1197,11 +1197,11 @@
 
     const renderRelatorios = () => {
         elements.viewTitle.innerText = 'Relatórios de Gestão';
-        
+
         const totalApps = state.appointments.length;
         const presentApps = state.appointments.filter(a => a.status === 'present').length;
         const attendanceRate = totalApps > 0 ? Math.round((presentApps / totalApps) * 100) : 0;
-        
+
         const appsPerProf = state.professionals.map(p => {
             const count = state.appointments.filter(a => a.professionalId === p.id).length;
             return { id: p.id, name: p.name, count };
@@ -1235,8 +1235,8 @@
                 <h3 style="margin-bottom: 24px;">Desempenho por Profissional</h3>
                 <div style="display: flex; flex-direction: column; gap: 20px;">
                     ${appsPerProf.map(p => {
-                        const percent = totalApps > 0 ? (p.count / totalApps) * 100 : 0;
-                        return `
+            const percent = totalApps > 0 ? (p.count / totalApps) * 100 : 0;
+            return `
                             <div style="width: 100%;">
                                 <div style="display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 14px; font-weight: 500;">
                                     <span class="prof-report-link" data-id="${p.id}" style="color: var(--primary); cursor: pointer; font-weight: 600;">${p.name}</span>
@@ -1247,7 +1247,7 @@
                                 </div>
                             </div>
                         `;
-                    }).join('')}
+        }).join('')}
                 </div>
             </div>
         `;
@@ -1265,7 +1265,7 @@
 
         const now = new Date();
         const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
-        
+
         elements.modalTitle.innerText = `Relatório: ${prof.name}`;
         elements.modalBody.innerHTML = `
             <div class="detailed-report">
@@ -1295,7 +1295,7 @@
                 </div>
             </div>
         `;
-        
+
         elements.modalOverlay.classList.remove('hidden');
 
         document.getElementById('generateReportBtn').onclick = () => {
@@ -1311,7 +1311,7 @@
 
     const renderDetailedReportContent = (profId, startDate, endDate) => {
         const container = document.getElementById('reportResultsContainer');
-        
+
         const filteredApps = state.appointments.filter(app => {
             if (app.professionalId !== profId) return false;
             return app.date >= startDate && app.date <= endDate;
@@ -1332,7 +1332,7 @@
         }).sort((a, b) => b.date.localeCompare(a.date));
 
         const getStatusText = (status) => {
-            switch(status) {
+            switch (status) {
                 case 'present': return 'Presente';
                 case 'absent': return 'Faltou';
                 case 'absent_notice': return 'Avisou';
@@ -1342,7 +1342,7 @@
         };
 
         const getStatusBg = (status) => {
-            switch(status) {
+            switch (status) {
                 case 'present': return '#dcfce7';
                 case 'absent': return '#fee2e2';
                 case 'absent_notice': return '#ffedd5';
@@ -1352,7 +1352,7 @@
         };
 
         const getStatusColor = (status) => {
-            switch(status) {
+            switch (status) {
                 case 'present': return '#16a34a';
                 case 'absent': return '#dc2626';
                 case 'absent_notice': return '#f59e0b';
@@ -1381,14 +1381,14 @@
                 <h4 style="font-size: 14px; margin-bottom: 12px;">Pacientes no Período</h4>
                 <div style="max-height: 250px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding-right: 4px;">
                     ${patients.map(p => {
-                        const currentMonthStr = formatDateISO(new Date()).substring(0, 7);
-                        const monthlyCount = state.appointments.filter(app => 
-                            app.patientId === p.patientId && 
-                            app.status === 'present' && 
-                            app.date.startsWith(currentMonthStr)
-                        ).length;
+            const currentMonthStr = formatDateISO(new Date()).substring(0, 7);
+            const monthlyCount = state.appointments.filter(app =>
+                app.patientId === p.patientId &&
+                app.status === 'present' &&
+                app.date.startsWith(currentMonthStr)
+            ).length;
 
-                        return `
+            return `
                         <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: #f8fafc; border-radius: 6px; font-size: 13px; border: 1px solid #f1f5f9;">
                             <div>
                                 <div style="font-weight: 600; color: var(--text-main);">${p.name}</div>
@@ -1402,7 +1402,7 @@
                             </div>
                         </div>
                         `;
-                    }).join('')}
+        }).join('')}
                     ${patients.length === 0 ? '<div style="text-align: center; color: var(--text-muted); font-size: 13px; padding: 20px;">Nenhum atendimento encontrado para este período.</div>' : ''}
                 </div>
             </div>
@@ -1421,10 +1421,10 @@
         elements.userName.innerText = state.currentUser.name;
         elements.userRole.innerText = state.currentUser.role === 'super-admin' ? 'Super Admin' : (state.currentUser.role === 'admin' ? 'Admin Principal' : (state.currentUser.specialty || 'Profissional'));
         elements.userAvatar.innerText = state.currentUser.name.substring(0, 2).toUpperCase();
-        
+
         // Handle menu visibility
         const isSuperAdmin = state.currentUser.role === 'super-admin';
-        
+
         document.querySelectorAll('.super-admin-only').forEach(el => el.classList.toggle('hidden', !isSuperAdmin));
         document.querySelectorAll('.admin-only').forEach(el => el.classList.toggle('hidden', isSuperAdmin));
 
@@ -1439,7 +1439,7 @@
             const clinic = state.clinics.find(c => c.id === state.currentClinicId);
             if (clinic && elements.sidebarClinic) {
                 elements.sidebarClinic.innerHTML = `
-                    <small>Unidade Ativa</small>
+                    <small> </small>
                     <span title="${clinic.name}">${clinic.name}</span>
                 `;
                 elements.sidebarClinic.classList.remove('hidden');
