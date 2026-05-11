@@ -599,6 +599,11 @@ h1, h2, h3, .logo span {
     border-left-color: #f59e0b;
 }
 
+.appointment-card.cancelled_prof {
+    background-color: #f3e8ff;
+    border-left-color: #7c3aed;
+}
+
 .appointment-card .time {
     font-weight: 700;
     margin-bottom: 2px;

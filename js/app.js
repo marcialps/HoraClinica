@@ -698,13 +698,14 @@
                 <p><strong>Profissional:</strong> ${prof ? prof.name : 'Desconhecido'}</p>
                 <p><strong>Data:</strong> ${app.date}</p>
                 <p><strong>Horário:</strong> ${app.time} (${app.duration} min)</p>
-                <p><strong>Status:</strong> ${app.status === 'present' ? 'Presente' : (app.status === 'absent' ? 'Não Compareceu' : (app.status === 'absent_notice' ? 'Faltou com Aviso' : 'Agendado'))}</p>
+                <p><strong>Status:</strong> ${app.status === 'present' ? 'Presente' : (app.status === 'absent' ? 'Não Compareceu' : (app.status === 'absent_notice' ? 'Faltou com Aviso' : (app.status === 'cancelled_prof' ? 'Cancelado pelo Profissional' : 'Agendado')))}</p>
                 <div class="actions" style="margin-top: 20px; display: flex; flex-direction: column; gap: 10px;">
                     <div style="display: flex; gap: 10px;">
                         <button id="markPresent" class="btn-primary" style="background-color: #10b981; flex: 1; justify-content: center;"><i class="fas fa-check"></i> Marcar Presença</button>
                         <button id="markAbsent" class="btn-primary" style="background-color: #ef4444; flex: 1; justify-content: center;"><i class="fas fa-times"></i> Não Compareceu</button>
                     </div>
                     <button id="markAbsentNotice" class="btn-primary" style="background-color: #f59e0b; width: 100%; justify-content: center;"><i class="fas fa-exclamation-triangle"></i> Faltou com aviso prévio</button>
+                    <button id="markCancelledProf" class="btn-primary" style="background-color: #7c3aed; width: 100%; justify-content: center;"><i class="fas fa-user-times"></i> Cancelado pelo Profissional</button>
                     <div style="display: flex; gap: 10px;">
                         <button id="editApp" class="btn-secondary" style="flex: 1; justify-content: center; margin-left: 0;"><i class="fas fa-edit"></i> Editar</button>
                         ${state.currentUser.role === 'admin' ? '<button id="deleteApp" class="btn-primary" style="background-color: #64748b; flex: 1; justify-content: center;"><i class="fas fa-trash"></i> Excluir</button>' : ''}
@@ -729,6 +730,12 @@
 
         document.getElementById('markAbsentNotice').onclick = async () => {
             app.status = 'absent_notice';
+            await saveData('appointments', app);
+            elements.modalOverlay.classList.add('hidden');
+        };
+
+        document.getElementById('markCancelledProf').onclick = async () => {
+            app.status = 'cancelled_prof';
             await saveData('appointments', app);
             elements.modalOverlay.classList.add('hidden');
         };
@@ -1292,6 +1299,7 @@
                 case 'present': return 'Presente';
                 case 'absent': return 'Faltou';
                 case 'absent_notice': return 'Avisou';
+                case 'cancelled_prof': return 'Cancelado (Prof)';
                 default: return 'Agendado';
             }
         };
@@ -1301,6 +1309,7 @@
                 case 'present': return '#dcfce7';
                 case 'absent': return '#fee2e2';
                 case 'absent_notice': return '#ffedd5';
+                case 'cancelled_prof': return '#f3e8ff';
                 default: return '#dbeafe';
             }
         };
@@ -1310,6 +1319,7 @@
                 case 'present': return '#16a34a';
                 case 'absent': return '#dc2626';
                 case 'absent_notice': return '#f59e0b';
+                case 'cancelled_prof': return '#7c3aed';
                 default: return '#2563eb';
             }
         };
