@@ -828,11 +828,19 @@
 
     const renderPacientes = () => {
         elements.viewTitle.innerText = 'Gestão de Pacientes';
+        
+        const existingSearch = document.getElementById('patientSearch');
+        const lastTerm = existingSearch ? existingSearch.value : "";
+
         elements.viewContent.innerHTML = `
             <div class="card" style="background: white; padding: 24px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
-                <div style="display: flex; justify-content: space-between; margin-bottom: 20px;">
-                    <h3>Lista de Pacientes</h3>
-                    <button class="btn-primary" id="newPatientBtn"><i class="fas fa-plus"></i> Novo Paciente</button>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; gap: 20px;">
+                    <h3 style="white-space: nowrap; margin: 0;">Lista de Pacientes</h3>
+                    <div style="position: relative; flex: 1; max-width: 400px;">
+                        <i class="fas fa-search" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-muted);"></i>
+                        <input type="text" id="patientSearch" placeholder="Buscar por nome, responsável ou telefone..." value="${lastTerm}" style="width: 100%; padding: 10px 10px 10px 40px; border-radius: 8px; border: 1px solid var(--border); font-size: 14px; outline: none; transition: border-color 0.2s;">
+                    </div>
+                    <button class="btn-primary" id="newPatientBtn" style="margin: 0;"><i class="fas fa-plus"></i> Novo Paciente</button>
                 </div>
                 <div style="overflow-x: auto;">
                     <table style="width: 100%; border-collapse: collapse; min-width: 600px;">
@@ -845,45 +853,22 @@
                                 <th style="padding: 12px;">Ações</th>
                             </tr>
                         </thead>
-                        <tbody>
-                            ${state.patients.map(p => `
-                                <tr style="border-bottom: 1px solid #f1f5f9;">
-                                    <td style="padding: 12px;">
-                                        <div class="patient-name-link" data-id="${p.id}" style="font-weight: 600; color: var(--primary); cursor: pointer;">${p.name}</div>
-                                        <div style="font-size: 11px; color: var(--text-muted);">${p.responsible ? `Resp: ${p.responsible}` : ''} ${p.age ? `| ${p.age} anos` : ''}</div>
-                                    </td>
-                                    <td style="padding: 12px;">
-                                        <a href="https://wa.me/55${cleanPhone(p.phone)}" target="_blank" class="phone-link" style="text-decoration: none; color: inherit; display: flex; align-items: center; gap: 6px;">
-                                            <i class="fab fa-whatsapp" style="color: #25d366;"></i>
-                                            ${p.phone}
-                                        </a>
-                                    </td>
-                                    <td style="padding: 12px;">${p.city || '-'}</td>
-                                    <td style="padding: 12px;">
-                                        <div style="display: flex; flex-wrap: wrap; gap: 4px;">
-                                            ${(Array.isArray(p.insurance) ? p.insurance : [p.insurance || 'Particular']).map(ins => `
-                                                <span class="badge-insurance" style="background: ${ins === 'Particular' ? '#f1f5f9' : '#dbeafe'}; color: ${ins === 'Particular' ? '#64748b' : '#2563eb'}; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 600;">
-                                                    ${ins}
-                                                </span>
-                                            `).join('')}
-                                        </div>
-                                    </td>
-                                    <td style="padding: 12px;">
-                                        <button class="edit-btn" data-id="${p.id}" title="Editar" style="background: none; border: none; color: #64748b; cursor: pointer; margin-right: 8px;"><i class="fas fa-edit"></i></button>
-                                        <button class="delete-patient-btn" data-id="${p.id}" title="Excluir" style="background: none; border: none; color: #ef4444; cursor: pointer;"><i class="fas fa-trash"></i></button>
-                                    </td>
-                                </tr>
-                            `).join('')}
-                        </tbody>
+                        <tbody id="patientTableBody"></tbody>
                     </table>
                 </div>
             </div>
         `;
-        
+
+        // Focus management
+        const newSearch = document.getElementById('patientSearch');
+        if (existingSearch === document.activeElement) {
+            newSearch.focus();
+            newSearch.setSelectionRange(newSearch.value.length, newSearch.value.length);
+        }
+
         const getInsuranceHTML = (selectedInsurances = []) => {
             if (!Array.isArray(selectedInsurances)) selectedInsurances = [selectedInsurances];
             if (selectedInsurances.length === 0) selectedInsurances = ['Particular'];
-
             const insurances = ['Particular', ...state.insurances.map(i => i.name)];
             return `
                 <div class="insurance-options" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 8px;">
@@ -909,26 +894,117 @@
                 addBtn.onclick = async () => {
                     const name = document.getElementById('newInsuranceName').value.trim();
                     if (name) {
-                        // Check if already in state
                         if (!state.insurances.find(i => i.name.toLowerCase() === name.toLowerCase())) {
-                            const newIns = { id: 'ins_' + Date.now(), name: name };
-                            await saveData('insurances', newIns);
+                            await saveData('insurances', { id: 'ins_' + Date.now(), name: name });
                         }
-                        
-                        // Collect currently selected
                         const selected = Array.from(document.querySelectorAll('input[name="pInsurance"]:checked')).map(cb => cb.value);
                         if (!selected.includes(name)) selected.push(name);
-                        
-                        // Update UI immediately
                         const container = document.getElementById('insuranceContainer');
                         if (container) {
                             container.innerHTML = getInsuranceHTML(selected);
-                            attachInsuranceLogic(); // Re-attach listener to the new button
+                            attachInsuranceLogic();
                         }
                     }
                 };
             }
         };
+
+        const renderTableRows = (term = "") => {
+            const tbody = document.getElementById('patientTableBody');
+            const filtered = state.patients.filter(p => 
+                p.name.toLowerCase().includes(term.toLowerCase()) ||
+                (p.responsible && p.responsible.toLowerCase().includes(term.toLowerCase())) ||
+                (p.phone && p.phone.includes(term)) ||
+                (p.city && p.city.toLowerCase().includes(term.toLowerCase()))
+            );
+
+            tbody.innerHTML = filtered.map(p => `
+                <tr style="border-bottom: 1px solid #f1f5f9;">
+                    <td style="padding: 12px;">
+                        <div class="patient-name-link" data-id="${p.id}" style="font-weight: 600; color: var(--primary); cursor: pointer;">${p.name}</div>
+                        <div style="font-size: 11px; color: var(--text-muted);">${p.responsible ? `Resp: ${p.responsible}` : ''} ${p.age ? `| ${p.age} anos` : ''}</div>
+                    </td>
+                    <td style="padding: 12px;">
+                        <a href="https://wa.me/55${cleanPhone(p.phone)}" target="_blank" class="phone-link" style="text-decoration: none; color: inherit; display: flex; align-items: center; gap: 6px;">
+                            <i class="fab fa-whatsapp" style="color: #25d366;"></i>
+                            ${p.phone}
+                        </a>
+                    </td>
+                    <td style="padding: 12px;">${p.city || '-'}</td>
+                    <td style="padding: 12px;">
+                        <div style="display: flex; flex-wrap: wrap; gap: 4px;">
+                            ${(Array.isArray(p.insurance) ? p.insurance : [p.insurance || 'Particular']).map(ins => `
+                                <span class="badge-insurance" style="background: ${ins === 'Particular' ? '#f1f5f9' : '#dbeafe'}; color: ${ins === 'Particular' ? '#64748b' : '#2563eb'}; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 600;">
+                                    ${ins}
+                                </span>
+                            `).join('')}
+                        </div>
+                    </td>
+                    <td style="padding: 12px;">
+                        <button class="edit-patient-btn" data-id="${p.id}" title="Editar" style="background: none; border: none; color: #64748b; cursor: pointer; margin-right: 8px;"><i class="fas fa-edit"></i></button>
+                        <button class="delete-patient-btn" data-id="${p.id}" title="Excluir" style="background: none; border: none; color: #ef4444; cursor: pointer;"><i class="fas fa-trash"></i></button>
+                    </td>
+                </tr>
+            `).join('');
+
+            tbody.querySelectorAll('.edit-patient-btn').forEach(btn => {
+                btn.onclick = () => {
+                    const patient = state.patients.find(p => p.id === btn.dataset.id);
+                    if (patient) openEditModal(patient);
+                };
+            });
+
+            tbody.querySelectorAll('.delete-patient-btn').forEach(btn => {
+                btn.onclick = async () => {
+                    if (confirm('Tem certeza que deseja excluir este paciente?')) {
+                        await deleteData('patients', btn.dataset.id);
+                    }
+                };
+            });
+
+            tbody.querySelectorAll('.patient-name-link').forEach(link => {
+                link.onclick = () => {
+                    const patient = state.patients.find(p => p.id === link.dataset.id);
+                    if (patient) openPatientDetails(patient);
+                };
+            });
+        };
+
+        const openEditModal = (patient) => {
+            elements.modalTitle.innerText = 'Editar Paciente';
+            elements.modalBody.innerHTML = `
+                <form id="editPatientForm">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                        <div class="form-group" style="grid-column: span 2;"><label>Nome Completo</label><input type="text" id="pName" value="${patient.name}" required></div>
+                        <div class="form-group"><label>Telefone</label><input type="text" id="pPhone" value="${patient.phone}" required></div>
+                        <div class="form-group"><label>Responsável</label><input type="text" id="pResponsible" value="${patient.responsible || ''}"></div>
+                        <div class="form-group"><label>Idade</label><input type="number" id="pAge" value="${patient.age || ''}"></div>
+                        <div class="form-group"><label>Cidade</label><input type="text" id="pCity" value="${patient.city || ''}"></div>
+                    </div>
+                    <div class="form-group">
+                        <label>Convênio</label>
+                        <div id="insuranceContainer">${getInsuranceHTML(patient.insurance || 'Particular')}</div>
+                    </div>
+                    <button type="submit" class="btn-primary" style="width: 100%; justify-content: center; margin-top: 20px;">Atualizar Paciente</button>
+                </form>
+            `;
+            elements.modalOverlay.classList.remove('hidden');
+            attachInsuranceLogic();
+            document.getElementById('editPatientForm').onsubmit = async (e) => {
+                e.preventDefault();
+                patient.name = document.getElementById('pName').value;
+                patient.phone = document.getElementById('pPhone').value;
+                patient.responsible = document.getElementById('pResponsible').value;
+                patient.age = document.getElementById('pAge').value;
+                patient.city = document.getElementById('pCity').value;
+                patient.insurance = Array.from(document.querySelectorAll('input[name="pInsurance"]:checked')).map(cb => cb.value);
+                await saveData('patients', patient);
+                elements.modalOverlay.classList.add('hidden');
+            };
+        };
+
+        newSearch.oninput = (e) => renderTableRows(e.target.value);
+        renderTableRows(lastTerm);
 
         document.getElementById('newPatientBtn').onclick = () => {
             elements.modalTitle.innerText = 'Novo Paciente';
@@ -950,7 +1026,6 @@
             `;
             elements.modalOverlay.classList.remove('hidden');
             attachInsuranceLogic();
-
             document.getElementById('patientForm').onsubmit = async (e) => {
                 e.preventDefault();
                 const p = { 
@@ -966,60 +1041,6 @@
                 elements.modalOverlay.classList.add('hidden');
             };
         };
-
-        document.querySelectorAll('.edit-btn').forEach(btn => {
-            btn.onclick = () => {
-                const patient = state.patients.find(p => p.id === btn.dataset.id);
-                if (patient) {
-                    elements.modalTitle.innerText = 'Editar Paciente';
-                    elements.modalBody.innerHTML = `
-                        <form id="editPatientForm">
-                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
-                                <div class="form-group" style="grid-column: span 2;"><label>Nome Completo</label><input type="text" id="pName" value="${patient.name}" required></div>
-                                <div class="form-group"><label>Telefone</label><input type="text" id="pPhone" value="${patient.phone}" required></div>
-                                <div class="form-group"><label>Responsável</label><input type="text" id="pResponsible" value="${patient.responsible || ''}"></div>
-                                <div class="form-group"><label>Idade</label><input type="number" id="pAge" value="${patient.age || ''}"></div>
-                                <div class="form-group"><label>Cidade</label><input type="text" id="pCity" value="${patient.city || ''}"></div>
-                            </div>
-                            <div class="form-group">
-                                <label>Convênio</label>
-                                <div id="insuranceContainer">${getInsuranceHTML(patient.insurance || 'Particular')}</div>
-                            </div>
-                            <button type="submit" class="btn-primary" style="width: 100%; justify-content: center; margin-top: 20px;">Atualizar Paciente</button>
-                        </form>
-                    `;
-                    elements.modalOverlay.classList.remove('hidden');
-                    attachInsuranceLogic();
-
-                    document.getElementById('editPatientForm').onsubmit = async (e) => {
-                        e.preventDefault();
-                        patient.name = document.getElementById('pName').value;
-                        patient.phone = document.getElementById('pPhone').value;
-                        patient.responsible = document.getElementById('pResponsible').value;
-                        patient.age = document.getElementById('pAge').value;
-                        patient.city = document.getElementById('pCity').value;
-                        patient.insurance = Array.from(document.querySelectorAll('input[name="pInsurance"]:checked')).map(cb => cb.value);
-                        await saveData('patients', patient);
-                        elements.modalOverlay.classList.add('hidden');
-                    };
-                }
-            };
-        });
-
-        document.querySelectorAll('.delete-patient-btn').forEach(btn => {
-            btn.onclick = async () => {
-                if (confirm('Tem certeza que deseja excluir este paciente?')) {
-                    await deleteData('patients', btn.dataset.id);
-                }
-            };
-        });
-
-        document.querySelectorAll('.patient-name-link').forEach(link => {
-            link.onclick = () => {
-                const patient = state.patients.find(p => p.id === link.dataset.id);
-                if (patient) openPatientDetails(patient);
-            };
-        });
     };
 
     const openPatientDetails = (p) => {
