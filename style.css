@@ -553,8 +553,8 @@ h1, h2, h3, .logo span {
     position: absolute;
     left: 4px;
     right: 4px;
-    background-color: #dcfce7; /* Green for scheduled */
-    border-left: 4px solid #22c55e;
+    background-color: #dbeafe; /* Blue for scheduled */
+    border-left: 4px solid #3b82f6;
     border-radius: var(--radius-sm);
     padding: 6px 8px;
     font-size: 12px;
@@ -573,14 +573,19 @@ h1, h2, h3, .logo span {
     z-index: 10;
 }
 
+.appointment-card.scheduled {
+    background-color: #dbeafe;
+    border-left-color: #3b82f6;
+}
+
 .appointment-card.confirmed {
     background-color: #dbeafe;
     border-left-color: #3b82f6;
 }
 
 .appointment-card.present {
-    background-color: #e0f2fe;
-    border-left-color: #0ea5e9;
+    background-color: #dcfce7; /* Green for present */
+    border-left-color: #22c55e;
 }
 
 .appointment-card.absent {
