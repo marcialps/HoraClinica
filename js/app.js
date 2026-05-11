@@ -9,7 +9,8 @@
         currentDate: new Date(new Date().setHours(0, 0, 0, 0)),
         currentUser: null, // Start logged out
         currentView: 'agenda',
-        insurances: []
+        insurances: [],
+        columnWidth: 150
     };
 
     // DOM Elements - to be populated on init
@@ -1258,7 +1259,9 @@
                 userName: document.getElementById('userName'),
                 userRole: document.getElementById('userRole'),
                 userAvatar: document.getElementById('userAvatar'),
-                logoutBtn: document.getElementById('logoutBtn')
+                logoutBtn: document.getElementById('logoutBtn'),
+                zoomOut: document.getElementById('zoomOut'),
+                zoomIn: document.getElementById('zoomIn')
             };
 
             // 1. Detect Clinic from URL immediately
@@ -1320,6 +1323,21 @@
             }
 
             elements.professionalFilter.onchange = () => renderView();
+
+            if (elements.zoomOut) {
+                elements.zoomOut.onclick = () => {
+                    state.columnWidth = Math.max(80, state.columnWidth - 10);
+                    document.documentElement.style.setProperty('--col-width', `${state.columnWidth}px`);
+                };
+            }
+
+            if (elements.zoomIn) {
+                elements.zoomIn.onclick = () => {
+                    state.columnWidth = Math.min(300, state.columnWidth + 10);
+                    document.documentElement.style.setProperty('--col-width', `${state.columnWidth}px`);
+                };
+            }
+
             elements.addAppointmentBtn.onclick = () => openNewAppointmentModal();
             elements.closeModal.onclick = () => elements.modalOverlay.classList.add('hidden');
             elements.logoutBtn.onclick = () => {

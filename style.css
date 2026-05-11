@@ -14,6 +14,7 @@
     --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
     --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
     --glass: blur(12px) saturate(180%);
+    --col-width: 150px;
 }
 
 * {
@@ -526,7 +527,7 @@ h1, h2, h3, .logo span {
 
 .professional-col {
     flex: 1;
-    min-width: 150px;
+    min-width: var(--col-width);
     border-right: 1px solid var(--border);
 }
 
