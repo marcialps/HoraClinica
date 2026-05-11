@@ -1161,7 +1161,7 @@
         
         const appsPerProf = state.professionals.map(p => {
             const count = state.appointments.filter(a => a.professionalId === p.id).length;
-            return { name: p.name, count };
+            return { id: p.id, name: p.name, count };
         });
 
         elements.viewContent.innerHTML = `
@@ -1196,7 +1196,7 @@
                         return `
                             <div style="width: 100%;">
                                 <div style="display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 14px; font-weight: 500;">
-                                    <span>${p.name}</span>
+                                    <span class="prof-report-link" data-id="${p.id}" style="color: var(--primary); cursor: pointer; font-weight: 600;">${p.name}</span>
                                     <span>${p.count} agendamentos (${Math.round(percent)}%)</span>
                                 </div>
                                 <div style="width: 100%; height: 12px; background: #f1f5f9; border-radius: 6px; overflow: hidden;">
@@ -1205,6 +1205,146 @@
                             </div>
                         `;
                     }).join('')}
+                </div>
+            </div>
+        `;
+
+        // Attach listeners
+        document.querySelectorAll('.prof-report-link').forEach(link => {
+            link.onclick = () => openDetailedProfessionalReport(link.dataset.id);
+        });
+    };
+
+
+    const openDetailedProfessionalReport = (profId) => {
+        const prof = state.professionals.find(p => p.id === profId);
+        if (!prof) return;
+
+        const now = new Date();
+        const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+        
+        elements.modalTitle.innerText = `Relatório: ${prof.name}`;
+        elements.modalBody.innerHTML = `
+            <div class="detailed-report">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px;">
+                    <div class="form-group">
+                        <label>Data Inicial</label>
+                        <input type="date" id="repStartDate" value="${formatDateISO(firstDay)}">
+                    </div>
+                    <div class="form-group">
+                        <label>Data Final</label>
+                        <input type="date" id="repEndDate" value="${formatDateISO(now)}">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Profissional</label>
+                    <select id="repProfId">
+                        ${state.professionals.map(p => `<option value="${p.id}" ${p.id === profId ? 'selected' : ''}>${p.name}</option>`).join('')}
+                    </select>
+                </div>
+                <button id="generateReportBtn" class="btn-primary" style="width: 100%; justify-content: center; margin-bottom: 24px;">
+                    <i class="fas fa-sync-alt"></i> Gerar Relatório
+                </button>
+                <div id="reportResultsContainer">
+                    <div style="text-align: center; color: var(--text-muted); padding: 20px;">
+                        Clique em "Gerar Relatório" para visualizar os dados.
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        elements.modalOverlay.classList.remove('hidden');
+
+        document.getElementById('generateReportBtn').onclick = () => {
+            const start = document.getElementById('repStartDate').value;
+            const end = document.getElementById('repEndDate').value;
+            const pId = document.getElementById('repProfId').value;
+            renderDetailedReportContent(pId, start, end);
+        };
+
+        // Auto-generate on open
+        renderDetailedReportContent(profId, formatDateISO(firstDay), formatDateISO(now));
+    };
+
+    const renderDetailedReportContent = (profId, startDate, endDate) => {
+        const container = document.getElementById('reportResultsContainer');
+        
+        const filteredApps = state.appointments.filter(app => {
+            if (app.professionalId !== profId) return false;
+            return app.date >= startDate && app.date <= endDate;
+        });
+
+        const total = filteredApps.length;
+        const present = filteredApps.filter(a => a.status === 'present').length;
+        const absent = filteredApps.filter(a => a.status === 'absent' || a.status === 'absent_notice').length;
+
+        const patients = filteredApps.map(a => {
+            const p = state.patients.find(pat => pat.id === a.patientId);
+            return {
+                name: p ? p.name : 'Desconhecido',
+                date: a.date,
+                status: a.status
+            };
+        }).sort((a, b) => b.date.localeCompare(a.date));
+
+        const getStatusText = (status) => {
+            switch(status) {
+                case 'present': return 'Presente';
+                case 'absent': return 'Faltou';
+                case 'absent_notice': return 'Avisou';
+                default: return 'Agendado';
+            }
+        };
+
+        const getStatusBg = (status) => {
+            switch(status) {
+                case 'present': return '#dcfce7';
+                case 'absent': return '#fee2e2';
+                case 'absent_notice': return '#ffedd5';
+                default: return '#dbeafe';
+            }
+        };
+
+        const getStatusColor = (status) => {
+            switch(status) {
+                case 'present': return '#16a34a';
+                case 'absent': return '#dc2626';
+                case 'absent_notice': return '#f59e0b';
+                default: return '#2563eb';
+            }
+        };
+
+        container.innerHTML = `
+            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 24px;">
+                <div style="background: #f8fafc; padding: 12px; border-radius: 8px; text-align: center; border: 1px solid var(--border);">
+                    <div style="font-size: 20px; font-weight: 700; color: var(--primary);">${total}</div>
+                    <div style="font-size: 10px; color: var(--text-muted); text-transform: uppercase;">Total</div>
+                </div>
+                <div style="background: #f0fdf4; padding: 12px; border-radius: 8px; text-align: center; border: 1px solid #bbf7d0;">
+                    <div style="font-size: 20px; font-weight: 700; color: #16a34a;">${present}</div>
+                    <div style="font-size: 10px; color: #16a34a; text-transform: uppercase;">Presenças</div>
+                </div>
+                <div style="background: #fef2f2; padding: 12px; border-radius: 8px; text-align: center; border: 1px solid #fecaca;">
+                    <div style="font-size: 20px; font-weight: 700; color: #dc2626;">${absent}</div>
+                    <div style="font-size: 10px; color: #dc2626; text-transform: uppercase;">Faltas</div>
+                </div>
+            </div>
+
+            <div style="border-top: 1px solid var(--border); padding-top: 16px;">
+                <h4 style="font-size: 14px; margin-bottom: 12px;">Pacientes no Período</h4>
+                <div style="max-height: 250px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding-right: 4px;">
+                    ${patients.map(p => `
+                        <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: #f8fafc; border-radius: 6px; font-size: 13px; border: 1px solid #f1f5f9;">
+                            <div>
+                                <div style="font-weight: 600; color: var(--text-main);">${p.name}</div>
+                                <div style="font-size: 11px; color: var(--text-muted);">${p.date.split('-').reverse().join('/')}</div>
+                            </div>
+                            <span style="font-size: 10px; padding: 2px 8px; border-radius: 100px; background: ${getStatusBg(p.status)}; color: ${getStatusColor(p.status)}; font-weight: 700; text-transform: uppercase;">
+                                ${getStatusText(p.status)}
+                            </span>
+                        </div>
+                    `).join('')}
+                    ${patients.length === 0 ? '<div style="text-align: center; color: var(--text-muted); font-size: 13px; padding: 20px;">Nenhum atendimento encontrado para este período.</div>' : ''}
                 </div>
             </div>
         `;
