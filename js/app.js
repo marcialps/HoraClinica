@@ -1305,7 +1305,8 @@
             return {
                 name: p ? p.name : 'Desconhecido',
                 date: a.date,
-                status: a.status
+                status: a.status,
+                patientId: a.patientId
             };
         }).sort((a, b) => b.date.localeCompare(a.date));
 
@@ -1358,17 +1359,29 @@
             <div style="border-top: 1px solid var(--border); padding-top: 16px;">
                 <h4 style="font-size: 14px; margin-bottom: 12px;">Pacientes no Período</h4>
                 <div style="max-height: 250px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding-right: 4px;">
-                    ${patients.map(p => `
+                    ${patients.map(p => {
+                        const currentMonthStr = formatDateISO(new Date()).substring(0, 7);
+                        const monthlyCount = state.appointments.filter(app => 
+                            app.patientId === p.patientId && 
+                            app.status === 'present' && 
+                            app.date.startsWith(currentMonthStr)
+                        ).length;
+
+                        return `
                         <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: #f8fafc; border-radius: 6px; font-size: 13px; border: 1px solid #f1f5f9;">
                             <div>
                                 <div style="font-weight: 600; color: var(--text-main);">${p.name}</div>
                                 <div style="font-size: 11px; color: var(--text-muted);">${p.date.split('-').reverse().join('/')}</div>
                             </div>
-                            <span style="font-size: 10px; padding: 2px 8px; border-radius: 100px; background: ${getStatusBg(p.status)}; color: ${getStatusColor(p.status)}; font-weight: 700; text-transform: uppercase;">
-                                ${getStatusText(p.status)}
-                            </span>
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                ${monthlyCount > 0 ? `<span title="Total de presenças no mês" style="background: #eff6ff; color: #2563eb; font-weight: 800; padding: 2px 6px; border-radius: 4px; font-size: 11px; border: 1px solid #dbeafe;">${monthlyCount}</span>` : ''}
+                                <span style="font-size: 10px; padding: 2px 8px; border-radius: 100px; background: ${getStatusBg(p.status)}; color: ${getStatusColor(p.status)}; font-weight: 700; text-transform: uppercase;">
+                                    ${getStatusText(p.status)}
+                                </span>
+                            </div>
                         </div>
-                    `).join('')}
+                        `;
+                    }).join('')}
                     ${patients.length === 0 ? '<div style="text-align: center; color: var(--text-muted); font-size: 13px; padding: 20px;">Nenhum atendimento encontrado para este período.</div>' : ''}
                 </div>
             </div>
