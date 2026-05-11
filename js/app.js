@@ -698,10 +698,15 @@
                 <p><strong>Data:</strong> ${app.date}</p>
                 <p><strong>Horário:</strong> ${app.time} (${app.duration} min)</p>
                 <p><strong>Status:</strong> ${app.status === 'present' ? 'Presente' : (app.status === 'absent' ? 'Não Compareceu' : 'Agendado')}</p>
-                <div class="actions" style="margin-top: 20px; display: flex; flex-wrap: wrap; gap: 10px;">
-                    <button id="markPresent" class="btn-primary" style="background-color: #10b981;"><i class="fas fa-check"></i> Marcar Presença</button>
-                    <button id="markAbsent" class="btn-primary" style="background-color: #ef4444;"><i class="fas fa-times"></i> Não Compareceu</button>
-                    ${state.currentUser.role === 'admin' ? '<button id="deleteApp" class="btn-primary" style="background-color: #64748b; width: 100%;"><i class="fas fa-trash"></i> Excluir Agendamento</button>' : ''}
+                <div class="actions" style="margin-top: 20px; display: flex; flex-direction: column; gap: 10px;">
+                    <div style="display: flex; gap: 10px;">
+                        <button id="markPresent" class="btn-primary" style="background-color: #10b981; flex: 1; justify-content: center;"><i class="fas fa-check"></i> Marcar Presença</button>
+                        <button id="markAbsent" class="btn-primary" style="background-color: #ef4444; flex: 1; justify-content: center;"><i class="fas fa-times"></i> Não Compareceu</button>
+                    </div>
+                    <div style="display: flex; gap: 10px;">
+                        <button id="editApp" class="btn-secondary" style="flex: 1; justify-content: center; margin-left: 0;"><i class="fas fa-edit"></i> Editar</button>
+                        ${state.currentUser.role === 'admin' ? '<button id="deleteApp" class="btn-primary" style="background-color: #64748b; flex: 1; justify-content: center;"><i class="fas fa-trash"></i> Excluir</button>' : ''}
+                    </div>
                 </div>
             </div>
         `;
@@ -719,6 +724,10 @@
             await saveData('appointments', app);
             elements.modalOverlay.classList.add('hidden');
         };
+
+        document.getElementById('editApp').onclick = () => {
+            openEditAppointmentModal(app);
+        };
         
         const deleteBtn = document.getElementById('deleteApp');
         if (deleteBtn) {
@@ -729,6 +738,62 @@
                 }
             };
         }
+    };
+
+    const openEditAppointmentModal = (app) => {
+        elements.modalTitle.innerText = 'Editar Agendamento';
+        elements.modalBody.innerHTML = `
+            <form id="editAppointmentForm">
+                <div class="form-group">
+                    <label>Paciente</label>
+                    <select id="appPatient" required>
+                        ${state.patients.map(p => `<option value="${p.id}" ${p.id === app.patientId ? 'selected' : ''}>${p.name}</option>`).join('')}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Profissional</label>
+                    <select id="appProfessional" required>
+                        ${state.professionals.map(p => `<option value="${p.id}" ${p.id === app.professionalId ? 'selected' : ''}>${p.name}</option>`).join('')}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Data</label>
+                    <input type="date" id="appDate" value="${app.date}" required>
+                </div>
+                <div class="form-group">
+                    <label>Horário</label>
+                    <input type="time" id="appTime" value="${app.time}" required>
+                </div>
+                <div class="form-group">
+                    <label>Duração (minutos)</label>
+                    <input type="number" id="appDuration" value="${app.duration || 45}" required>
+                </div>
+                <div class="form-group">
+                    <label>Recorrência</label>
+                    <select id="appRecurring">
+                        <option value="none" ${!app.recurring ? 'selected' : ''}>Nenhuma</option>
+                        <option value="weekly" ${app.recurringType === 'weekly' ? 'selected' : ''}>Semanal (Indeterminado)</option>
+                    </select>
+                </div>
+                <button type="submit" class="btn-primary" style="width: 100%; justify-content: center;">Salvar Alterações</button>
+            </form>
+        `;
+        
+        elements.modalOverlay.classList.remove('hidden');
+        
+        document.getElementById('editAppointmentForm').onsubmit = async (e) => {
+            e.preventDefault();
+            app.patientId = document.getElementById('appPatient').value;
+            app.professionalId = document.getElementById('appProfessional').value;
+            app.date = document.getElementById('appDate').value;
+            app.time = document.getElementById('appTime').value;
+            app.duration = parseInt(document.getElementById('appDuration').value);
+            app.recurring = document.getElementById('appRecurring').value !== 'none';
+            app.recurringType = document.getElementById('appRecurring').value;
+            
+            await saveData('appointments', app);
+            elements.modalOverlay.classList.add('hidden');
+        };
     };
 
     const renderPacientes = () => {
