@@ -697,12 +697,13 @@
                 <p><strong>Profissional:</strong> ${prof ? prof.name : 'Desconhecido'}</p>
                 <p><strong>Data:</strong> ${app.date}</p>
                 <p><strong>Horário:</strong> ${app.time} (${app.duration} min)</p>
-                <p><strong>Status:</strong> ${app.status === 'present' ? 'Presente' : (app.status === 'absent' ? 'Não Compareceu' : 'Agendado')}</p>
+                <p><strong>Status:</strong> ${app.status === 'present' ? 'Presente' : (app.status === 'absent' ? 'Não Compareceu' : (app.status === 'absent_notice' ? 'Faltou com Aviso' : 'Agendado'))}</p>
                 <div class="actions" style="margin-top: 20px; display: flex; flex-direction: column; gap: 10px;">
                     <div style="display: flex; gap: 10px;">
                         <button id="markPresent" class="btn-primary" style="background-color: #10b981; flex: 1; justify-content: center;"><i class="fas fa-check"></i> Marcar Presença</button>
                         <button id="markAbsent" class="btn-primary" style="background-color: #ef4444; flex: 1; justify-content: center;"><i class="fas fa-times"></i> Não Compareceu</button>
                     </div>
+                    <button id="markAbsentNotice" class="btn-primary" style="background-color: #f59e0b; width: 100%; justify-content: center;"><i class="fas fa-exclamation-triangle"></i> Faltou com aviso prévio</button>
                     <div style="display: flex; gap: 10px;">
                         <button id="editApp" class="btn-secondary" style="flex: 1; justify-content: center; margin-left: 0;"><i class="fas fa-edit"></i> Editar</button>
                         ${state.currentUser.role === 'admin' ? '<button id="deleteApp" class="btn-primary" style="background-color: #64748b; flex: 1; justify-content: center;"><i class="fas fa-trash"></i> Excluir</button>' : ''}
@@ -721,6 +722,12 @@
 
         document.getElementById('markAbsent').onclick = async () => {
             app.status = 'absent';
+            await saveData('appointments', app);
+            elements.modalOverlay.classList.add('hidden');
+        };
+
+        document.getElementById('markAbsentNotice').onclick = async () => {
+            app.status = 'absent_notice';
             await saveData('appointments', app);
             elements.modalOverlay.classList.add('hidden');
         };

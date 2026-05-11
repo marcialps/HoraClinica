@@ -593,6 +593,11 @@ h1, h2, h3, .logo span {
     border-left-color: #ef4444;
 }
 
+.appointment-card.absent_notice {
+    background-color: #ffedd5;
+    border-left-color: #f59e0b;
+}
+
 .appointment-card .time {
     font-weight: 700;
     margin-bottom: 2px;
