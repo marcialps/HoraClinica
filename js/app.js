@@ -659,7 +659,7 @@
                     <label>Recorrência</label>
                     <select id="appRecurring">
                         <option value="none">Nenhuma</option>
-                        <option value="weekly">Semanal (Indeterminado)</option>
+                        <option value="weekly" selected>Semanal (Indeterminado)</option>
                     </select>
                 </div>
                 <button type="submit" class="btn-primary" style="width: 100%; justify-content: center;">Salvar Agendamento</button>
