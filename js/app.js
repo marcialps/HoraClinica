@@ -1395,7 +1395,7 @@
                                 <div style="font-size: 11px; color: var(--text-muted);">${p.date.split('-').reverse().join('/')}</div>
                             </div>
                             <div style="display: flex; align-items: center; gap: 8px;">
-                                ${monthlyCount > 0 ? `<span title="Total de presenças no mês" style="background: #eff6ff; color: #2563eb; font-weight: 800; padding: 2px 6px; border-radius: 4px; font-size: 11px; border: 1px solid #dbeafe;">${monthlyCount}</span>` : ''}
+                                ${monthlyCount > 0 ? `<span title="Total de presenças no mês" style="background: #eff6ff; color: #2563eb; font-weight: 800; padding: 2px 8px; border-radius: 4px; font-size: 11px; border: 1px solid #dbeafe; display: flex; align-items: center; gap: 4px;"><span style="font-weight: 500; font-size: 10px; opacity: 0.8;">Neste mês:</span>${monthlyCount}</span>` : ''}
                                 <span style="font-size: 10px; padding: 2px 8px; border-radius: 100px; background: ${getStatusBg(p.status)}; color: ${getStatusColor(p.status)}; font-weight: 700; text-transform: uppercase;">
                                     ${getStatusText(p.status)}
                                 </span>
