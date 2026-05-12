@@ -675,13 +675,13 @@
                     <label>Recorrência</label>
                     <select id="appRecurring">
                         <option value="none">Nenhuma</option>
-                        <option value="weekly" selected>Semanal (Indeterminado)</option>
+                        <option value="weekly" selected>Semanal</option>
                     </select>
                 </div>
                 <div class="form-group" id="recurringCountGroup">
                     <label>Número de Repetições (Semanas)</label>
                     <input type="number" id="appRecurringCount" value="1" min="1" max="52" placeholder="Ex: 4">
-                    <small style="color: var(--text-muted); display: block; margin-top: 4px;">Deixe 1 para recorrência indeterminada ou coloque o número de semanas desejado.</small>
+                    <small style="color: var(--text-muted); display: block; margin-top: 4px;">Agende a consulta para as próximas X semanas (Ex: 1 para apenas hoje, 4 para 4 semanas).</small>
                 </div>
                 <button type="submit" class="btn-primary" style="width: 100%; justify-content: center;">Salvar Agendamento</button>
             </form>
@@ -711,8 +711,8 @@
             const recurringType = document.getElementById('appRecurring').value;
             const recurringCount = parseInt(document.getElementById('appRecurringCount').value) || 1;
 
-            if (recurringType === 'weekly' && recurringCount > 1) {
-                // Create multiple appointments
+            if (recurringType === 'weekly') {
+                // Create N appointments based on recurringCount
                 const [year, month, day] = startDate.split('-').map(Number);
                 let currentDate = new Date(year, month - 1, day);
 
@@ -725,7 +725,7 @@
                         date: dateStr,
                         time: appTime,
                         duration,
-                        recurring: false, // Individual records
+                        recurring: false, // Always individual records now
                         recurringType: 'none',
                         status: 'scheduled'
                     };
@@ -735,7 +735,7 @@
                     currentDate.setDate(currentDate.getDate() + 7);
                 }
             } else {
-                // Standard single or indeterminate recurring appointment
+                // Single appointment (None selected)
                 const newApp = {
                     id: Date.now().toString(),
                     patientId,
@@ -743,8 +743,8 @@
                     date: startDate,
                     time: appTime,
                     duration,
-                    recurring: recurringType !== 'none',
-                    recurringType: recurringType,
+                    recurring: false,
+                    recurringType: 'none',
                     status: 'scheduled'
                 };
                 await saveData('appointments', newApp);
@@ -854,13 +854,13 @@
                     <label>Recorrência</label>
                     <select id="appRecurring">
                         <option value="none" ${!app.recurring ? 'selected' : ''}>Nenhuma</option>
-                        <option value="weekly" ${app.recurringType === 'weekly' ? 'selected' : ''}>Semanal (Indeterminado)</option>
+                        <option value="weekly" ${app.recurringType === 'weekly' ? 'selected' : ''}>Semanal</option>
                     </select>
                 </div>
                 <div class="form-group" id="editRecurringCountGroup" style="${!app.recurring ? 'display: none;' : ''}">
                     <label>Número de Repetições (Semanas)</label>
                     <input type="number" id="appRecurringCount" value="1" min="1" max="52">
-                    <small style="color: var(--text-muted); display: block; margin-top: 4px;">Use para criar novas repetições a partir desta data.</small>
+                    <small style="color: var(--text-muted); display: block; margin-top: 4px;">Informe quantas semanas deseja agendar a partir desta data.</small>
                 </div>
                 <button type="submit" class="btn-primary" style="width: 100%; justify-content: center;">Salvar Alterações</button>
             </form>
@@ -886,8 +886,8 @@
             const recurringType = document.getElementById('appRecurring').value;
             const recurringCount = parseInt(document.getElementById('appRecurringCount').value) || 1;
 
-            if (recurringType === 'weekly' && recurringCount > 1) {
-                // Update current and create additional ones
+            if (recurringType === 'weekly') {
+                // Create multiple appointments
                 const [year, month, day] = startDate.split('-').map(Number);
                 let currentDate = new Date(year, month - 1, day);
 
@@ -901,7 +901,7 @@
                 app.recurringType = 'none';
                 await saveData('appointments', app);
 
-                // Create N-1 more
+                // Create N-1 more if recurringCount > 1
                 for (let i = 1; i < recurringCount; i++) {
                     currentDate.setDate(currentDate.getDate() + 7);
                     const dateStr = formatDateISO(currentDate);
@@ -924,8 +924,8 @@
                 app.date = startDate;
                 app.time = appTime;
                 app.duration = duration;
-                app.recurring = recurringType !== 'none';
-                app.recurringType = recurringType;
+                app.recurring = false;
+                app.recurringType = 'none';
                 await saveData('appointments', app);
             }
 
