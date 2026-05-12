@@ -10,7 +10,8 @@
         currentUser: null, // Start logged out
         currentView: 'agenda',
         insurances: [],
-        columnWidth: 150
+        columnWidth: 150,
+        agendaSearch: ''
     };
 
     // DOM Elements - to be populated on init
@@ -427,11 +428,26 @@
         elements.viewContent.innerHTML = '';
 
         switch (state.currentView) {
-            case 'agenda': renderAgenda(); break;
-            case 'pacientes': renderPacientes(); break;
-            case 'profissionais': renderProfissionais(); break;
-            case 'relatorios': renderRelatorios(); break;
-            case 'super-admin': renderSuperAdmin(); break;
+            case 'agenda': 
+                if (elements.agendaSearchContainer) elements.agendaSearchContainer.classList.remove('hidden');
+                renderAgenda(); 
+                break;
+            case 'pacientes': 
+                if (elements.agendaSearchContainer) elements.agendaSearchContainer.classList.add('hidden');
+                renderPacientes(); 
+                break;
+            case 'profissionais': 
+                if (elements.agendaSearchContainer) elements.agendaSearchContainer.classList.add('hidden');
+                renderProfissionais(); 
+                break;
+            case 'relatorios': 
+                if (elements.agendaSearchContainer) elements.agendaSearchContainer.classList.add('hidden');
+                renderRelatorios(); 
+                break;
+            case 'super-admin': 
+                if (elements.agendaSearchContainer) elements.agendaSearchContainer.classList.add('hidden');
+                renderSuperAdmin(); 
+                break;
         }
     };
 
@@ -612,6 +628,15 @@
         const dateStr = formatDateISO(date);
         return state.appointments.filter(app => {
             if (app.professionalId !== profId) return false;
+
+            // Search filter
+            if (state.agendaSearch) {
+                const patient = state.patients.find(p => p.id === app.patientId);
+                if (!patient || !patient.name.toLowerCase().includes(state.agendaSearch.toLowerCase())) {
+                    return false;
+                }
+            }
+
             if (app.date === dateStr) return true;
             if (app.recurring && app.recurringType === 'weekly') {
                 const [y, m, d] = app.date.split('-').map(Number);
@@ -1590,7 +1615,9 @@
                 logoutBtn: document.getElementById('logoutBtn'),
                 sidebarClinic: document.getElementById('sidebarClinic'),
                 zoomOut: document.getElementById('zoomOut'),
-                zoomIn: document.getElementById('zoomIn')
+                zoomIn: document.getElementById('zoomIn'),
+                agendaSearchContainer: document.getElementById('agendaSearchContainer'),
+                agendaPatientSearch: document.getElementById('agendaPatientSearch')
             };
 
             // 1. Detect Clinic from URL immediately
@@ -1652,6 +1679,11 @@
             }
 
             elements.professionalFilter.onchange = () => renderView();
+            
+            elements.agendaPatientSearch.oninput = (e) => {
+                state.agendaSearch = e.target.value;
+                renderAgenda(); // Render grid only to avoid losing focus if we call renderView
+            };
 
             if (elements.zoomOut) {
                 elements.zoomOut.onclick = () => {
