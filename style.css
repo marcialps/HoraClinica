@@ -671,7 +671,10 @@ h1, h2, h3, .logo span {
     width: 90%;
     max-width: 500px;
     box-shadow: var(--shadow-lg);
-    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    max-height: 90vh; /* Don't exceed viewport height */
+    overflow: hidden; /* Ensure border-radius is respected */
 }
 
 .modal-header {
@@ -692,6 +695,8 @@ h1, h2, h3, .logo span {
 
 .modal-body {
     padding: 24px;
+    overflow-y: auto; /* Enable scrolling */
+    flex-grow: 1;
 }
 
 .form-group {
