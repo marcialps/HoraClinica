@@ -114,7 +114,7 @@
             document.getElementById('superAdminForm').onsubmit = (e) => {
                 e.preventDefault();
                 const pass = document.getElementById('superPass').value;
-                if (pass === 'admin123') {
+                if (pass === 'admin*123') {
                     state.currentUser = { role: 'super-admin', name: 'Super Admin' };
                     state.currentClinicId = null;
                     elements.modalOverlay.classList.add('hidden');
@@ -678,26 +678,78 @@
                         <option value="weekly" selected>Semanal (Indeterminado)</option>
                     </select>
                 </div>
+                <div class="form-group" id="recurringCountGroup">
+                    <label>Número de Repetições (Semanas)</label>
+                    <input type="number" id="appRecurringCount" value="1" min="1" max="52" placeholder="Ex: 4">
+                    <small style="color: var(--text-muted); display: block; margin-top: 4px;">Deixe 1 para recorrência indeterminada ou coloque o número de semanas desejado.</small>
+                </div>
                 <button type="submit" class="btn-primary" style="width: 100%; justify-content: center;">Salvar Agendamento</button>
             </form>
         `;
 
         elements.modalOverlay.classList.remove('hidden');
 
+        // Toggle recurring count field
+        const recurringSelect = document.getElementById('appRecurring');
+        const countGroup = document.getElementById('recurringCountGroup');
+        
+        recurringSelect.addEventListener('change', () => {
+            countGroup.style.display = recurringSelect.value === 'none' ? 'none' : 'block';
+        });
+        
+        // Initial state
+        countGroup.style.display = recurringSelect.value === 'none' ? 'none' : 'block';
+
         document.getElementById('appointmentForm').onsubmit = async (e) => {
             e.preventDefault();
-            const newApp = {
-                id: Date.now().toString(),
-                patientId: document.getElementById('appPatient').value,
-                professionalId: document.getElementById('appProfessional').value,
-                date: document.getElementById('appDate').value,
-                time: document.getElementById('appTime').value,
-                duration: parseInt(document.getElementById('appDuration').value),
-                recurring: document.getElementById('appRecurring').value !== 'none',
-                recurringType: document.getElementById('appRecurring').value,
-                status: 'scheduled'
-            };
-            await saveData('appointments', newApp);
+            
+            const patientId = document.getElementById('appPatient').value;
+            const professionalId = document.getElementById('appProfessional').value;
+            const startDate = document.getElementById('appDate').value;
+            const appTime = document.getElementById('appTime').value;
+            const duration = parseInt(document.getElementById('appDuration').value);
+            const recurringType = document.getElementById('appRecurring').value;
+            const recurringCount = parseInt(document.getElementById('appRecurringCount').value) || 1;
+
+            if (recurringType === 'weekly' && recurringCount > 1) {
+                // Create multiple appointments
+                const [year, month, day] = startDate.split('-').map(Number);
+                let currentDate = new Date(year, month - 1, day);
+
+                for (let i = 0; i < recurringCount; i++) {
+                    const dateStr = formatDateISO(currentDate);
+                    const newApp = {
+                        id: (Date.now() + i).toString(),
+                        patientId,
+                        professionalId,
+                        date: dateStr,
+                        time: appTime,
+                        duration,
+                        recurring: false, // Individual records
+                        recurringType: 'none',
+                        status: 'scheduled'
+                    };
+                    await saveData('appointments', newApp);
+                    
+                    // Increment date by 7 days for next occurrence
+                    currentDate.setDate(currentDate.getDate() + 7);
+                }
+            } else {
+                // Standard single or indeterminate recurring appointment
+                const newApp = {
+                    id: Date.now().toString(),
+                    patientId,
+                    professionalId,
+                    date: startDate,
+                    time: appTime,
+                    duration,
+                    recurring: recurringType !== 'none',
+                    recurringType: recurringType,
+                    status: 'scheduled'
+                };
+                await saveData('appointments', newApp);
+            }
+
             elements.modalOverlay.classList.add('hidden');
         };
     };
@@ -805,23 +857,78 @@
                         <option value="weekly" ${app.recurringType === 'weekly' ? 'selected' : ''}>Semanal (Indeterminado)</option>
                     </select>
                 </div>
+                <div class="form-group" id="editRecurringCountGroup" style="${!app.recurring ? 'display: none;' : ''}">
+                    <label>Número de Repetições (Semanas)</label>
+                    <input type="number" id="appRecurringCount" value="1" min="1" max="52">
+                    <small style="color: var(--text-muted); display: block; margin-top: 4px;">Use para criar novas repetições a partir desta data.</small>
+                </div>
                 <button type="submit" class="btn-primary" style="width: 100%; justify-content: center;">Salvar Alterações</button>
             </form>
         `;
 
         elements.modalOverlay.classList.remove('hidden');
 
+        const recurringSelect = document.getElementById('appRecurring');
+        const countGroup = document.getElementById('editRecurringCountGroup');
+        
+        recurringSelect.addEventListener('change', () => {
+            countGroup.style.display = recurringSelect.value === 'none' ? 'none' : 'block';
+        });
+
         document.getElementById('editAppointmentForm').onsubmit = async (e) => {
             e.preventDefault();
-            app.patientId = document.getElementById('appPatient').value;
-            app.professionalId = document.getElementById('appProfessional').value;
-            app.date = document.getElementById('appDate').value;
-            app.time = document.getElementById('appTime').value;
-            app.duration = parseInt(document.getElementById('appDuration').value);
-            app.recurring = document.getElementById('appRecurring').value !== 'none';
-            app.recurringType = document.getElementById('appRecurring').value;
+            
+            const patientId = document.getElementById('appPatient').value;
+            const professionalId = document.getElementById('appProfessional').value;
+            const startDate = document.getElementById('appDate').value;
+            const appTime = document.getElementById('appTime').value;
+            const duration = parseInt(document.getElementById('appDuration').value);
+            const recurringType = document.getElementById('appRecurring').value;
+            const recurringCount = parseInt(document.getElementById('appRecurringCount').value) || 1;
 
-            await saveData('appointments', app);
+            if (recurringType === 'weekly' && recurringCount > 1) {
+                // Update current and create additional ones
+                const [year, month, day] = startDate.split('-').map(Number);
+                let currentDate = new Date(year, month - 1, day);
+
+                // Update original
+                app.patientId = patientId;
+                app.professionalId = professionalId;
+                app.date = formatDateISO(currentDate);
+                app.time = appTime;
+                app.duration = duration;
+                app.recurring = false;
+                app.recurringType = 'none';
+                await saveData('appointments', app);
+
+                // Create N-1 more
+                for (let i = 1; i < recurringCount; i++) {
+                    currentDate.setDate(currentDate.getDate() + 7);
+                    const dateStr = formatDateISO(currentDate);
+                    const newApp = {
+                        id: (Date.now() + i).toString(),
+                        patientId,
+                        professionalId,
+                        date: dateStr,
+                        time: appTime,
+                        duration,
+                        recurring: false,
+                        recurringType: 'none',
+                        status: 'scheduled'
+                    };
+                    await saveData('appointments', newApp);
+                }
+            } else {
+                app.patientId = patientId;
+                app.professionalId = professionalId;
+                app.date = startDate;
+                app.time = appTime;
+                app.duration = duration;
+                app.recurring = recurringType !== 'none';
+                app.recurringType = recurringType;
+                await saveData('appointments', app);
+            }
+
             elements.modalOverlay.classList.add('hidden');
         };
     };
