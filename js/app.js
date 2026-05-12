@@ -681,11 +681,11 @@
                     </div>
                     <div class="form-group" id="recurringCountGroup" style="flex: 1; margin-bottom: 0;">
                         <label>Repetições (Semanas)</label>
-                        <input type="number" id="appRecurringCount" value="1" min="1" max="52" placeholder="Ex: 4">
+                        <input type="number" id="appRecurringCount" value="48" min="1" max="52" placeholder="Ex: 48">
                     </div>
                 </div>
                 <small style="color: var(--text-muted); display: block; margin-top: -12px; margin-bottom: 20px; font-size: 11px;">
-                    Agende para as próximas X semanas (Ex: 1 para apenas hoje, 4 para 4 semanas).
+                    Agende para as próximas X semanas (Ex: 1 para apenas hoje, 48 para 48 semanas).
                 </small>
                 <button type="submit" class="btn-primary" style="width: 100%; justify-content: center;">Salvar Agendamento</button>
             </form>
@@ -864,7 +864,7 @@
                     </div>
                     <div class="form-group" id="editRecurringCountGroup" style="flex: 1; margin-bottom: 0; ${!app.recurring ? 'display: none;' : ''}">
                         <label>Repetições (Semanas)</label>
-                        <input type="number" id="appRecurringCount" value="1" min="1" max="52">
+                        <input type="number" id="appRecurringCount" value="48" min="1" max="52">
                     </div>
                 </div>
                 <small style="color: var(--text-muted); display: block; margin-top: -12px; margin-bottom: 20px; font-size: 11px;">
