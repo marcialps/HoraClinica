@@ -253,21 +253,13 @@
         document.getElementById('loginScreen').classList.add('hidden');
         document.getElementById('app').classList.add('hidden');
 
-        const startNow = document.getElementById('startNow');
-        if (startNow) {
-            startNow.onclick = () => {
-                if (state.clinics.length > 0) {
-                    renderLoginScreen();
-                } else {
-                    alert("Nenhuma clínica cadastrada no sistema. Use o Portal do Parceiro para criar a primeira clínica.");
-                }
-            };
-        }
-
-        const loginBtn = document.getElementById('loginBtn');
-        if (loginBtn) {
-            loginBtn.onclick = () => renderLoginScreen();
-        }
+        document.getElementById('startNow').onclick = () => {
+            if (state.clinics.length > 0) {
+                renderLoginScreen();
+            } else {
+                alert("Nenhuma clínica cadastrada no sistema. Use o Portal do Parceiro para criar a primeira clínica.");
+            }
+        };
 
         document.getElementById('goToSuperAdmin').onclick = () => {
             document.getElementById('loginSuperAdmin').click();
