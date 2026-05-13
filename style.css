@@ -491,6 +491,44 @@ h1, h2, h3, .logo span {
     color: var(--primary);
 }
 
+.btn-whatsapp {
+    background: linear-gradient(135deg, #25d366 0%, #128c7e 100%);
+    color: white;
+    text-decoration: none;
+    padding: 14px 32px;
+    border-radius: var(--radius-md);
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 4px 15px rgba(37, 211, 102, 0.3);
+    border: none;
+    font-size: 16px;
+    font-family: 'Inter', sans-serif;
+}
+
+.btn-whatsapp:hover {
+    transform: translateY(-3px) scale(1.05);
+    box-shadow: 0 12px 30px rgba(37, 211, 102, 0.4);
+    filter: brightness(1.1);
+    color: white;
+}
+
+.btn-whatsapp i {
+    font-size: 24px;
+}
+
+@keyframes pulse-whatsapp {
+    0% { box-shadow: 0 0 0 0 rgba(37, 211, 102, 0.4); }
+    70% { box-shadow: 0 0 0 15px rgba(37, 211, 102, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(37, 211, 102, 0); }
+}
+
+.btn-whatsapp {
+    animation: pulse-whatsapp 2s infinite;
+}
+
 #currentDateDisplay {
     font-weight: 500;
     min-width: 160px;
