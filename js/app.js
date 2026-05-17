@@ -592,13 +592,13 @@
 
         if (state.currentUser.role === 'professional') {
             isSingleProfessional = true;
-            singleProfessional = state.professionals.find(p => p.id === state.currentUser.id);
+            singleProfessional = state.professionals.find(p => String(p.id) === String(state.currentUser.id));
             elements.professionalFilter.parentElement.classList.add('hidden');
         } else {
             elements.professionalFilter.parentElement.classList.remove('hidden');
             if (filterVal !== 'all') {
                 isSingleProfessional = true;
-                singleProfessional = state.professionals.find(p => p.id === filterVal);
+                singleProfessional = state.professionals.find(p => String(p.id) === String(filterVal));
             }
         }
 
