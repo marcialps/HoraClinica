@@ -428,25 +428,25 @@
         elements.viewContent.innerHTML = '';
 
         switch (state.currentView) {
-            case 'agenda': 
+            case 'agenda':
                 if (elements.agendaSearchContainer) elements.agendaSearchContainer.classList.remove('hidden');
-                renderAgenda(); 
+                renderAgenda();
                 break;
-            case 'pacientes': 
+            case 'pacientes':
                 if (elements.agendaSearchContainer) elements.agendaSearchContainer.classList.add('hidden');
-                renderPacientes(); 
+                renderPacientes();
                 break;
-            case 'profissionais': 
+            case 'profissionais':
                 if (elements.agendaSearchContainer) elements.agendaSearchContainer.classList.add('hidden');
-                renderProfissionais(); 
+                renderProfissionais();
                 break;
-            case 'relatorios': 
+            case 'relatorios':
                 if (elements.agendaSearchContainer) elements.agendaSearchContainer.classList.add('hidden');
-                renderRelatorios(); 
+                renderRelatorios();
                 break;
-            case 'super-admin': 
+            case 'super-admin':
                 if (elements.agendaSearchContainer) elements.agendaSearchContainer.classList.add('hidden');
-                renderSuperAdmin(); 
+                renderSuperAdmin();
                 break;
         }
     };
@@ -604,17 +604,17 @@
 
         if (isSingleProfessional && singleProfessional) {
             elements.viewTitle.innerText = `Agenda da Semana - ${singleProfessional.name}`;
-            
+
             const startOfWeek = new Date(state.currentDate);
             const day = startOfWeek.getDay();
             startOfWeek.setDate(startOfWeek.getDate() - day);
 
             const endOfWeek = new Date(startOfWeek);
             endOfWeek.setDate(startOfWeek.getDate() + 6);
-            elements.currentDateDisplay.innerText = `${startOfWeek.toLocaleDateString('pt-BR', {day: '2-digit', month: '2-digit'})} até ${endOfWeek.toLocaleDateString('pt-BR', {day: '2-digit', month: '2-digit'})}`;
+            elements.currentDateDisplay.innerText = `${startOfWeek.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })} até ${endOfWeek.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}`;
 
             const dayNames = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
-            
+
             for (let i = 0; i < 7; i++) {
                 const currentDay = new Date(startOfWeek);
                 currentDay.setDate(startOfWeek.getDate() + i);
@@ -626,7 +626,7 @@
                 header.className = 'prof-header';
                 header.style.flexDirection = 'column';
                 header.style.lineHeight = '1.2';
-                header.innerHTML = `<div>${dayNames[currentDay.getDay()]}</div><div style="font-size: 12px; color: var(--text-muted); font-weight: normal;">${currentDay.toLocaleDateString('pt-BR', {day: '2-digit', month: '2-digit'})}</div>`;
+                header.innerHTML = `<div>${dayNames[currentDay.getDay()]}</div><div style="font-size: 12px; color: var(--text-muted); font-weight: normal;">${currentDay.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}</div>`;
                 col.appendChild(header);
 
                 const container = document.createElement('div');
@@ -642,7 +642,7 @@
                 profsGrid.appendChild(col);
             }
         } else {
-            elements.viewTitle.innerText = 'Agenda do Dia (V2)';
+            elements.viewTitle.innerText = 'Agenda do Dia';
             elements.currentDateDisplay.innerText = formatDate(state.currentDate);
 
             state.professionals.forEach(prof => {
@@ -769,17 +769,17 @@
         // Toggle recurring count field
         const recurringSelect = document.getElementById('appRecurring');
         const countGroup = document.getElementById('recurringCountGroup');
-        
+
         recurringSelect.addEventListener('change', () => {
             countGroup.style.display = recurringSelect.value === 'none' ? 'none' : 'block';
         });
-        
+
         // Initial state
         countGroup.style.display = recurringSelect.value === 'none' ? 'none' : 'block';
 
         document.getElementById('appointmentForm').onsubmit = async (e) => {
             e.preventDefault();
-            
+
             const patientId = document.getElementById('appPatient').value;
             const professionalId = document.getElementById('appProfessional').value;
             const startDate = document.getElementById('appDate').value;
@@ -807,7 +807,7 @@
                         status: 'scheduled'
                     };
                     await saveData('appointments', newApp);
-                    
+
                     // Increment date by 7 days for next occurrence
                     currentDate.setDate(currentDate.getDate() + 7);
                 }
@@ -951,14 +951,14 @@
 
         const recurringSelect = document.getElementById('appRecurring');
         const countGroup = document.getElementById('editRecurringCountGroup');
-        
+
         recurringSelect.addEventListener('change', () => {
             countGroup.style.display = recurringSelect.value === 'none' ? 'none' : 'block';
         });
 
         document.getElementById('editAppointmentForm').onsubmit = async (e) => {
             e.preventDefault();
-            
+
             const patientId = document.getElementById('appPatient').value;
             const professionalId = document.getElementById('appProfessional').value;
             const startDate = document.getElementById('appDate').value;
@@ -1692,14 +1692,14 @@
             });
 
             elements.prevDay.onclick = () => {
-                const isWeekView = state.currentView === 'agenda' && 
+                const isWeekView = state.currentView === 'agenda' &&
                     (state.currentUser.role === 'professional' || elements.professionalFilter.value !== 'all');
                 state.currentDate.setDate(state.currentDate.getDate() - (isWeekView ? 7 : 1));
                 renderView();
             };
 
             elements.nextDay.onclick = () => {
-                const isWeekView = state.currentView === 'agenda' && 
+                const isWeekView = state.currentView === 'agenda' &&
                     (state.currentUser.role === 'professional' || elements.professionalFilter.value !== 'all');
                 state.currentDate.setDate(state.currentDate.getDate() + (isWeekView ? 7 : 1));
                 renderView();
@@ -1731,7 +1731,7 @@
             }
 
             elements.professionalFilter.onchange = () => renderView();
-            
+
             elements.agendaPatientSearch.oninput = (e) => {
                 state.agendaSearch = e.target.value;
                 renderAgenda(); // Render grid only to avoid losing focus if we call renderView
