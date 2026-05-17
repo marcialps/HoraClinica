@@ -642,7 +642,7 @@
                 profsGrid.appendChild(col);
             }
         } else {
-            elements.viewTitle.innerText = 'Agenda do Dia';
+            elements.viewTitle.innerText = 'Agenda do Dia (V2)';
             elements.currentDateDisplay.innerText = formatDate(state.currentDate);
 
             state.professionals.forEach(prof => {
