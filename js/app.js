@@ -564,8 +564,6 @@
 
     const renderAgenda = () => {
         elements.viewContent.innerHTML = '';
-        elements.viewTitle.innerText = 'Agenda do Dia';
-        elements.currentDateDisplay.innerText = formatDate(state.currentDate);
 
         // Sync hidden date picker value
         if (elements.hiddenDatePicker) {
@@ -589,36 +587,86 @@
         profsGrid.className = 'professionals-grid';
 
         const filterVal = elements.professionalFilter.value;
-        let filteredProfs = filterVal === 'all' ? state.professionals : state.professionals.filter(p => p.id === filterVal);
+        let isSingleProfessional = false;
+        let singleProfessional = null;
 
         if (state.currentUser.role === 'professional') {
-            filteredProfs = state.professionals.filter(p => p.id === state.currentUser.id);
+            isSingleProfessional = true;
+            singleProfessional = state.professionals.find(p => p.id === state.currentUser.id);
             elements.professionalFilter.parentElement.classList.add('hidden');
         } else {
             elements.professionalFilter.parentElement.classList.remove('hidden');
+            if (filterVal !== 'all') {
+                isSingleProfessional = true;
+                singleProfessional = state.professionals.find(p => p.id === filterVal);
+            }
         }
 
-        filteredProfs.forEach(prof => {
-            const col = document.createElement('div');
-            col.className = 'professional-col';
+        if (isSingleProfessional && singleProfessional) {
+            elements.viewTitle.innerText = `Agenda da Semana - ${singleProfessional.name}`;
+            
+            const startOfWeek = new Date(state.currentDate);
+            const day = startOfWeek.getDay();
+            startOfWeek.setDate(startOfWeek.getDate() - day);
 
-            const header = document.createElement('div');
-            header.className = 'prof-header';
-            header.innerText = prof.name;
-            col.appendChild(header);
+            const endOfWeek = new Date(startOfWeek);
+            endOfWeek.setDate(startOfWeek.getDate() + 6);
+            elements.currentDateDisplay.innerText = `${startOfWeek.toLocaleDateString('pt-BR', {day: '2-digit', month: '2-digit'})} até ${endOfWeek.toLocaleDateString('pt-BR', {day: '2-digit', month: '2-digit'})}`;
 
-            const container = document.createElement('div');
-            container.className = 'appointments-container';
+            const dayNames = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
+            
+            for (let i = 0; i < 7; i++) {
+                const currentDay = new Date(startOfWeek);
+                currentDay.setDate(startOfWeek.getDate() + i);
 
-            const dayApps = getAppointmentsForDay(state.currentDate, prof.id);
-            dayApps.forEach(app => {
-                const card = createAppointmentCard(app);
-                container.appendChild(card);
+                const col = document.createElement('div');
+                col.className = 'professional-col';
+
+                const header = document.createElement('div');
+                header.className = 'prof-header';
+                header.style.flexDirection = 'column';
+                header.style.lineHeight = '1.2';
+                header.innerHTML = `<div>${dayNames[currentDay.getDay()]}</div><div style="font-size: 12px; color: var(--text-muted); font-weight: normal;">${currentDay.toLocaleDateString('pt-BR', {day: '2-digit', month: '2-digit'})}</div>`;
+                col.appendChild(header);
+
+                const container = document.createElement('div');
+                container.className = 'appointments-container';
+
+                const dayApps = getAppointmentsForDay(currentDay, singleProfessional.id);
+                dayApps.forEach(app => {
+                    const card = createAppointmentCard(app);
+                    container.appendChild(card);
+                });
+
+                col.appendChild(container);
+                profsGrid.appendChild(col);
+            }
+        } else {
+            elements.viewTitle.innerText = 'Agenda do Dia';
+            elements.currentDateDisplay.innerText = formatDate(state.currentDate);
+
+            state.professionals.forEach(prof => {
+                const col = document.createElement('div');
+                col.className = 'professional-col';
+
+                const header = document.createElement('div');
+                header.className = 'prof-header';
+                header.innerText = prof.name;
+                col.appendChild(header);
+
+                const container = document.createElement('div');
+                container.className = 'appointments-container';
+
+                const dayApps = getAppointmentsForDay(state.currentDate, prof.id);
+                dayApps.forEach(app => {
+                    const card = createAppointmentCard(app);
+                    container.appendChild(card);
+                });
+
+                col.appendChild(container);
+                profsGrid.appendChild(col);
             });
-
-            col.appendChild(container);
-            profsGrid.appendChild(col);
-        });
+        }
 
         grid.appendChild(profsGrid);
         elements.viewContent.appendChild(grid);
@@ -1644,12 +1692,16 @@
             });
 
             elements.prevDay.onclick = () => {
-                state.currentDate.setDate(state.currentDate.getDate() - 1);
+                const isWeekView = state.currentView === 'agenda' && 
+                    (state.currentUser.role === 'professional' || elements.professionalFilter.value !== 'all');
+                state.currentDate.setDate(state.currentDate.getDate() - (isWeekView ? 7 : 1));
                 renderView();
             };
 
             elements.nextDay.onclick = () => {
-                state.currentDate.setDate(state.currentDate.getDate() + 1);
+                const isWeekView = state.currentView === 'agenda' && 
+                    (state.currentUser.role === 'professional' || elements.professionalFilter.value !== 'all');
+                state.currentDate.setDate(state.currentDate.getDate() + (isWeekView ? 7 : 1));
                 renderView();
             };
 
