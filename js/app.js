@@ -11,7 +11,8 @@
         currentView: 'agenda',
         insurances: [],
         columnWidth: 150,
-        agendaSearch: ''
+        agendaSearch: '',
+        recentlyDeletedIds: new Set()
     };
 
     // DOM Elements - to be populated on init
@@ -299,6 +300,9 @@
         unsubscribes.forEach(unsub => unsub());
         unsubscribes = [];
 
+        // Clear recently deleted cache when switching/re-setting listeners
+        state.recentlyDeletedIds.clear();
+
         // 1. Clinics Listener (Always active)
         const unsubClinics = db.collection('clinics').onSnapshot(snapshot => {
             state.clinics = snapshot.docs.map(doc => doc.data());
@@ -326,13 +330,13 @@
             const clinicRef = db.collection('clinics').doc(state.currentClinicId);
 
             const unsubPatients = clinicRef.collection('patients').onSnapshot(snapshot => {
-                state.patients = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                state.patients = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
                 if (state.currentUser) renderView();
             });
             unsubscribes.push(unsubPatients);
 
             const unsubProfs = clinicRef.collection('professionals').onSnapshot(snapshot => {
-                state.professionals = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                state.professionals = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
                 if (state.currentUser) {
                     populateProfFilter();
                     renderView();
@@ -343,7 +347,8 @@
             unsubscribes.push(unsubProfs);
 
             const unsubApps = clinicRef.collection('appointments').onSnapshot(snapshot => {
-                state.appointments = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                const loadedApps = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+                state.appointments = loadedApps.filter(app => !state.recentlyDeletedIds.has(app.id));
                 if (state.currentUser) {
                     renderView();
                 } else {
@@ -353,7 +358,7 @@
             unsubscribes.push(unsubApps);
 
             const unsubInsurances = clinicRef.collection('insurances').onSnapshot(snapshot => {
-                state.insurances = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                state.insurances = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
                 if (state.currentUser && state.currentView === 'pacientes') renderPacientes();
             });
             unsubscribes.push(unsubInsurances);
@@ -1201,18 +1206,43 @@
                     </div>
                 `;
 
-                // Batch deletion function
+                // Bulletproof deletion function
                 const batchDelete = async (ids) => {
                     if (!state.currentClinicId) return;
+                    console.log("Iniciando exclusão dos agendamentos:", ids);
+                    
+                    const cleanIds = ids
+                        .filter(id => id !== null && id !== undefined && id !== '')
+                        .map(id => String(id).trim());
+
+                    if (cleanIds.length === 0) return;
+
                     try {
-                        const batch = db.batch();
-                        ids.forEach(id => {
-                            const docRef = db.collection('clinics').doc(state.currentClinicId).collection('appointments').doc(id);
-                            batch.delete(docRef);
+                        // Deletar individualmente para evitar falhas atômicas de lote (batch failures)
+                        const deletePromises = cleanIds.map(async (id) => {
+                            try {
+                                await db.collection('clinics')
+                                    .doc(state.currentClinicId)
+                                    .collection('appointments')
+                                    .doc(id)
+                                    .delete();
+                                console.log(`Agendamento ${id} excluído com sucesso do Firestore.`);
+                            } catch (err) {
+                                console.error(`Erro ao excluir agendamento ${id} no Firestore:`, err);
+                                throw err;
+                            }
                         });
-                        await batch.commit();
+
+                        const results = await Promise.allSettled(deletePromises);
+                        const rejected = results.filter(r => r.status === 'rejected');
+                        
+                        if (rejected.length === cleanIds.length) {
+                            alert("Não foi possível excluir os agendamentos. Verifique sua conexão ou permissões.");
+                        } else if (rejected.length > 0) {
+                            console.warn(`${rejected.length} agendamentos falharam ao excluir de um total de ${cleanIds.length}.`);
+                        }
                     } catch (e) {
-                        console.error("Erro ao deletar em lote:", e);
+                        console.error("Erro na exclusão geral:", e);
                         alert("Erro ao excluir agendamentos.");
                     }
                 };
@@ -1235,6 +1265,8 @@
                 };
 
                 const optimisticLocalDelete = (idsToDelete) => {
+                    // Adicionar ao recém-deletados no estado global para evitar flicker com o listener do Firestore
+                    idsToDelete.forEach(id => state.recentlyDeletedIds.add(id));
                     state.appointments = state.appointments.filter(a => !idsToDelete.includes(a.id));
                     renderView();
                 };
