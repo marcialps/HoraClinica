@@ -348,7 +348,10 @@
 
             const unsubApps = clinicRef.collection('appointments').onSnapshot(snapshot => {
                 const loadedApps = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
-                state.appointments = loadedApps.filter(app => !state.recentlyDeletedIds.has(app.id));
+                state.appointments = loadedApps.filter(app => {
+                    const appNormId = app.id !== null && app.id !== undefined ? String(app.id).trim() : '';
+                    return !state.recentlyDeletedIds.has(appNormId);
+                });
                 if (state.currentUser) {
                     renderView();
                 } else {
@@ -1265,9 +1268,19 @@
                 };
 
                 const optimisticLocalDelete = (idsToDelete) => {
-                    // Adicionar ao recém-deletados no estado global para evitar flicker com o listener do Firestore
-                    idsToDelete.forEach(id => state.recentlyDeletedIds.add(id));
-                    state.appointments = state.appointments.filter(a => !idsToDelete.includes(a.id));
+                    // Normalizar todos os IDs a serem excluídos para String limpa
+                    const normalizedToDelete = idsToDelete
+                        .filter(id => id !== null && id !== undefined)
+                        .map(id => String(id).trim());
+
+                    // Adicionar ao recém-deletados no estado global
+                    normalizedToDelete.forEach(id => state.recentlyDeletedIds.add(id));
+                    
+                    // Filtrar agendamentos usando comparação normalizada em string
+                    state.appointments = state.appointments.filter(a => {
+                        const aNormId = a.id !== null && a.id !== undefined ? String(a.id).trim() : '';
+                        return !normalizedToDelete.includes(aNormId);
+                    });
                     renderView();
                 };
 
