@@ -976,6 +976,7 @@
                 // Create N appointments based on recurringCount
                 const [year, month, day] = startDate.split('-').map(Number);
                 let currentDate = new Date(year, month - 1, day);
+                const recurringGroupId = Date.now().toString();
 
                 for (let i = 0; i < recurringCount; i++) {
                     const dateStr = formatDateISO(currentDate);
@@ -986,8 +987,9 @@
                         date: dateStr,
                         time: appTime,
                         duration,
-                        recurring: false, // Always individual records now
-                        recurringType: 'none',
+                        recurring: true,
+                        recurringType: 'weekly',
+                        recurringGroupId: recurringGroupId,
                         status: 'scheduled'
                     };
                     await saveData('appointments', newApp);
@@ -1006,6 +1008,7 @@
                     duration,
                     recurring: false,
                     recurringType: 'none',
+                    recurringGroupId: null,
                     status: 'scheduled'
                 };
                 await saveData('appointments', newApp);
@@ -1076,7 +1079,40 @@
         if (deleteBtn) {
             deleteBtn.onclick = async () => {
                 if (confirm('Tem certeza que deseja excluir este agendamento?')) {
-                    await deleteData('appointments', app.id);
+                    const getWeekday = (dateStr) => {
+                        const [year, month, day] = dateStr.split('-').map(Number);
+                        return new Date(year, month - 1, day).getDay();
+                    };
+
+                    let sequenceApps = [];
+                    if (app.recurringGroupId) {
+                        sequenceApps = state.appointments.filter(a => a.recurringGroupId === app.recurringGroupId && a.date > app.date);
+                    } else {
+                        // Heuristic for legacy recurring appointments
+                        const currentWeekday = getWeekday(app.date);
+                        sequenceApps = state.appointments.filter(a => 
+                            a.id !== app.id &&
+                            a.patientId === app.patientId &&
+                            a.professionalId === app.professionalId &&
+                            a.time === app.time &&
+                            a.date > app.date &&
+                            getWeekday(a.date) === currentWeekday
+                        );
+                    }
+
+                    if (sequenceApps.length > 0) {
+                        if (confirm(`Este agendamento possui ${sequenceApps.length} recorrências futuras nesta sequência.\n\nDeseja excluir também TODOS os próximos agendamentos desta sequência?\n\n- Clique em [OK] para excluir este E os futuros.\n- Clique em [Cancelar] para excluir APENAS este agendamento específico.`)) {
+                            // Delete current and future ones in parallel
+                            const toDelete = [app, ...sequenceApps];
+                            await Promise.all(toDelete.map(a => deleteData('appointments', a.id)));
+                        } else {
+                            // Delete only the current one
+                            await deleteData('appointments', app.id);
+                        }
+                    } else {
+                        // No future sequence found, delete only the current one
+                        await deleteData('appointments', app.id);
+                    }
                     elements.modalOverlay.classList.add('hidden');
                 }
             };
@@ -1169,6 +1205,7 @@
                 // Create multiple appointments
                 const [year, month, day] = startDate.split('-').map(Number);
                 let currentDate = new Date(year, month - 1, day);
+                const recurringGroupId = Date.now().toString();
 
                 // Update original
                 app.patientId = patientId;
@@ -1176,8 +1213,9 @@
                 app.date = formatDateISO(currentDate);
                 app.time = appTime;
                 app.duration = duration;
-                app.recurring = false;
-                app.recurringType = 'none';
+                app.recurring = true;
+                app.recurringType = 'weekly';
+                app.recurringGroupId = recurringGroupId;
                 await saveData('appointments', app);
 
                 // Create N-1 more if recurringCount > 1
@@ -1191,8 +1229,9 @@
                         date: dateStr,
                         time: appTime,
                         duration,
-                        recurring: false,
-                        recurringType: 'none',
+                        recurring: true,
+                        recurringType: 'weekly',
+                        recurringGroupId: recurringGroupId,
                         status: 'scheduled'
                     };
                     await saveData('appointments', newApp);
@@ -1205,6 +1244,7 @@
                 app.duration = duration;
                 app.recurring = false;
                 app.recurringType = 'none';
+                app.recurringGroupId = app.recurringGroupId || null;
                 await saveData('appointments', app);
             }
 
