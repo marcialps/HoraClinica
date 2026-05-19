@@ -1078,43 +1078,92 @@
         const deleteBtn = document.getElementById('deleteApp');
         if (deleteBtn) {
             deleteBtn.onclick = async () => {
-                if (confirm('Tem certeza que deseja excluir este agendamento?')) {
-                    const getWeekday = (dateStr) => {
-                        const [year, month, day] = dateStr.split('-').map(Number);
-                        return new Date(year, month - 1, day).getDay();
+                const getWeekday = (dateStr) => {
+                    if (!dateStr) return null;
+                    const [year, month, day] = dateStr.split('-').map(Number);
+                    return new Date(year, month - 1, day).getDay();
+                };
+
+                let sequenceApps = [];
+                if (app.recurringGroupId) {
+                    sequenceApps = state.appointments.filter(a => a.date && a.recurringGroupId === app.recurringGroupId && a.date > app.date);
+                } else {
+                    // Heuristic for legacy recurring appointments
+                    const currentWeekday = getWeekday(app.date);
+                    sequenceApps = state.appointments.filter(a => 
+                        a.date &&
+                        a.id !== app.id &&
+                        a.patientId === app.patientId &&
+                        a.professionalId === app.professionalId &&
+                        a.time === app.time &&
+                        a.date > app.date &&
+                        getWeekday(a.date) === currentWeekday
+                    );
+                }
+
+                // Show a premium confirmation screen inside the modal body!
+                elements.modalTitle.innerText = 'Excluir Agendamento';
+                elements.modalBody.innerHTML = `
+                    <div class="confirm-delete-view" style="display: flex; flex-direction: column; align-items: center; text-align: center; padding: 20px; gap: 20px;">
+                        <div style="width: 64px; height: 64px; background: #fee2e2; color: #ef4444; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 28px;">
+                            <i class="fas fa-exclamation-triangle"></i>
+                        </div>
+                        <div>
+                            <h3 style="font-size: 18px; font-weight: 600; color: var(--text-main); margin: 0 0 8px 0;">Tem certeza que deseja excluir?</h3>
+                            <p style="font-size: 14px; color: var(--text-muted); margin: 0; line-height: 1.5;">O agendamento de <strong>${patient ? patient.name : 'Desconhecido'}</strong> em <strong>${app.date}</strong> às <strong>${app.time}</strong> será removido permanentemente.</p>
+                        </div>
+                        
+                        ${sequenceApps.length > 0 ? `
+                            <div style="background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 16px; text-align: left; width: 100%;">
+                                <p style="font-size: 13px; color: var(--text-main); font-weight: 600; margin: 0 0 8px 0; display: flex; align-items: center; gap: 8px;">
+                                    <i class="fas fa-redo-alt" style="color: var(--primary);"></i> Série Recorrente Detectada
+                                </p>
+                                <p style="font-size: 12px; color: var(--text-muted); margin: 0; line-height: 1.4;">Encontramos mais <strong>${sequenceApps.length} agendamentos futuros</strong> pertencentes a essa mesma sequência semanal.</p>
+                            </div>
+                        ` : ''}
+
+                        <div style="display: flex; flex-direction: column; gap: 10px; width: 100%; margin-top: 10px;">
+                            ${sequenceApps.length > 0 ? `
+                                <button id="btnDeleteSequence" class="btn-primary" style="background-color: #ef4444; justify-content: center; width: 100%;">
+                                    <i class="fas fa-trash-alt"></i> Excluir este e os futuros (${sequenceApps.length + 1})
+                                </button>
+                                <button id="btnDeleteOnlyThis" class="btn-secondary" style="color: #ef4444; border-color: #fca5a5; justify-content: center; width: 100%;">
+                                    <i class="fas fa-minus-circle"></i> Excluir apenas este agendamento
+                                </button>
+                            ` : `
+                                <button id="btnConfirmDeleteSingle" class="btn-primary" style="background-color: #ef4444; justify-content: center; width: 100%;">
+                                    <i class="fas fa-trash-alt"></i> Confirmar Exclusão
+                                </button>
+                            `}
+                            <button id="btnCancelDelete" class="btn-secondary" style="justify-content: center; width: 100%; margin-left: 0;">
+                                Voltar para Detalhes
+                            </button>
+                        </div>
+                    </div>
+                `;
+
+                // Attach handlers to confirmation modal buttons
+                if (sequenceApps.length > 0) {
+                    document.getElementById('btnDeleteSequence').onclick = async () => {
+                        const toDelete = [app, ...sequenceApps];
+                        await Promise.all(toDelete.map(a => deleteData('appointments', a.id)));
+                        elements.modalOverlay.classList.add('hidden');
                     };
 
-                    let sequenceApps = [];
-                    if (app.recurringGroupId) {
-                        sequenceApps = state.appointments.filter(a => a.recurringGroupId === app.recurringGroupId && a.date > app.date);
-                    } else {
-                        // Heuristic for legacy recurring appointments
-                        const currentWeekday = getWeekday(app.date);
-                        sequenceApps = state.appointments.filter(a => 
-                            a.id !== app.id &&
-                            a.patientId === app.patientId &&
-                            a.professionalId === app.professionalId &&
-                            a.time === app.time &&
-                            a.date > app.date &&
-                            getWeekday(a.date) === currentWeekday
-                        );
-                    }
-
-                    if (sequenceApps.length > 0) {
-                        if (confirm(`Este agendamento possui ${sequenceApps.length} recorrências futuras nesta sequência.\n\nDeseja excluir também TODOS os próximos agendamentos desta sequência?\n\n- Clique em [OK] para excluir este E os futuros.\n- Clique em [Cancelar] para excluir APENAS este agendamento específico.`)) {
-                            // Delete current and future ones in parallel
-                            const toDelete = [app, ...sequenceApps];
-                            await Promise.all(toDelete.map(a => deleteData('appointments', a.id)));
-                        } else {
-                            // Delete only the current one
-                            await deleteData('appointments', app.id);
-                        }
-                    } else {
-                        // No future sequence found, delete only the current one
+                    document.getElementById('btnDeleteOnlyThis').onclick = async () => {
                         await deleteData('appointments', app.id);
-                    }
-                    elements.modalOverlay.classList.add('hidden');
+                        elements.modalOverlay.classList.add('hidden');
+                    };
+                } else {
+                    document.getElementById('btnConfirmDeleteSingle').onclick = async () => {
+                        await deleteData('appointments', app.id);
+                        elements.modalOverlay.classList.add('hidden');
+                    };
                 }
+
+                document.getElementById('btnCancelDelete').onclick = () => {
+                    openAppointmentDetails(app);
+                };
             };
         }
     };
