@@ -410,7 +410,7 @@
     };
 
     const cleanPhone = (phone) => {
-        return phone.replace(/\D/g, '');
+        return phone ? phone.replace(/\D/g, '') : '';
     };
 
     const initSearchableSelect = (containerEl, options, defaultValue, onSelect) => {
@@ -1311,10 +1311,12 @@
                         <div style="font-size: 11px; color: var(--text-muted);">${p.responsible ? `Resp: ${p.responsible}` : ''} ${p.age ? `| ${p.age} anos` : ''}</div>
                     </td>
                     <td style="padding: 12px;">
-                        <a href="https://wa.me/55${cleanPhone(p.phone)}" target="_blank" class="phone-link" style="text-decoration: none; color: inherit; display: flex; align-items: center; gap: 6px;">
-                            <i class="fab fa-whatsapp" style="color: #25d366;"></i>
-                            ${p.phone}
-                        </a>
+                        ${p.phone ? `
+                            <a href="https://wa.me/55${cleanPhone(p.phone)}" target="_blank" class="phone-link" style="text-decoration: none; color: inherit; display: flex; align-items: center; gap: 6px;">
+                                <i class="fab fa-whatsapp" style="color: #25d366;"></i>
+                                ${p.phone}
+                            </a>
+                        ` : '-'}
                     </td>
                     <td style="padding: 12px;">${p.city || '-'}</td>
                     <td style="padding: 12px;">
@@ -1362,7 +1364,7 @@
                 <form id="editPatientForm">
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
                         <div class="form-group" style="grid-column: span 2;"><label>Nome Completo</label><input type="text" id="pName" value="${patient.name}" required></div>
-                        <div class="form-group"><label>Telefone</label><input type="text" id="pPhone" value="${patient.phone}" required></div>
+                        <div class="form-group"><label>Telefone</label><input type="text" id="pPhone" value="${patient.phone || ''}"></div>
                         <div class="form-group"><label>Responsável</label><input type="text" id="pResponsible" value="${patient.responsible || ''}"></div>
                         <div class="form-group"><label>Idade</label><input type="number" id="pAge" value="${patient.age || ''}"></div>
                         <div class="form-group"><label>Cidade</label><input type="text" id="pCity" value="${patient.city || ''}"></div>
@@ -1398,7 +1400,7 @@
                 <form id="patientForm">
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
                         <div class="form-group" style="grid-column: span 2;"><label>Nome Completo</label><input type="text" id="pName" required></div>
-                        <div class="form-group"><label>Telefone</label><input type="text" id="pPhone" required></div>
+                        <div class="form-group"><label>Telefone</label><input type="text" id="pPhone"></div>
                         <div class="form-group"><label>Responsável</label><input type="text" id="pResponsible"></div>
                         <div class="form-group"><label>Idade</label><input type="number" id="pAge"></div>
                         <div class="form-group"><label>Cidade</label><input type="text" id="pCity"></div>
@@ -1449,10 +1451,12 @@
                     <div class="detail-item">
                         <label style="display: block; font-size: 12px; color: var(--text-muted); margin-bottom: 4px; font-weight: 500;">TELEFONE</label>
                         <div style="font-weight: 600; color: var(--text-main);">
-                            <a href="https://wa.me/55${cleanPhone(p.phone)}" target="_blank" class="phone-link" style="text-decoration: none; color: inherit; display: flex; align-items: center; gap: 8px;">
-                                <i class="fab fa-whatsapp" style="font-size: 18px; color: #25d366;"></i>
-                                ${p.phone}
-                            </a>
+                            ${p.phone ? `
+                                <a href="https://wa.me/55${cleanPhone(p.phone)}" target="_blank" class="phone-link" style="text-decoration: none; color: inherit; display: flex; align-items: center; gap: 8px;">
+                                    <i class="fab fa-whatsapp" style="font-size: 18px; color: #25d366;"></i>
+                                    ${p.phone}
+                                </a>
+                            ` : 'Sem telefone'}
                         </div>
                     </div>
                     <div class="detail-item">
