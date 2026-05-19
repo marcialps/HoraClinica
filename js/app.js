@@ -716,15 +716,165 @@
         return card;
     };
 
+    const escapeHtml = (str) => {
+        if (str == null) return '';
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+    };
+
+    const getPatientComboboxHTML = (selectedId = '') => {
+        const defaultId = selectedId || (state.patients[0] ? state.patients[0].id : '');
+        const selected = state.patients.find(p => p.id === defaultId);
+        const displayName = selected ? selected.name : '';
+
+        if (state.patients.length === 0) {
+            return `<p style="color: var(--text-muted); font-size: 14px;">Nenhum paciente cadastrado. Cadastre um paciente antes de agendar.</p>`;
+        }
+
+        return `
+            <div class="patient-combobox">
+                <input type="hidden" id="appPatient" value="${escapeHtml(defaultId)}" required>
+                <div class="patient-combobox-control">
+                    <input type="text" class="patient-combobox-input" placeholder="Buscar ou selecionar paciente..." value="${escapeHtml(displayName)}" autocomplete="off" aria-autocomplete="list" aria-expanded="false">
+                    <button type="button" class="patient-combobox-toggle" tabindex="-1" aria-label="Abrir lista de pacientes">
+                        <i class="fas fa-chevron-down"></i>
+                    </button>
+                </div>
+                <ul class="patient-combobox-dropdown hidden" role="listbox">
+                    ${state.patients.map(p => `
+                        <li class="patient-combobox-option${p.id === defaultId ? ' selected' : ''}"
+                            role="option"
+                            data-id="${escapeHtml(p.id)}"
+                            data-name="${escapeHtml(p.name)}">${escapeHtml(p.name)}</li>
+                    `).join('')}
+                </ul>
+            </div>
+        `;
+    };
+
+    const initPatientCombobox = () => {
+        const root = document.querySelector('.patient-combobox');
+        if (!root) return;
+
+        const hidden = root.querySelector('#appPatient');
+        const input = root.querySelector('.patient-combobox-input');
+        const dropdown = root.querySelector('.patient-combobox-dropdown');
+        const toggle = root.querySelector('.patient-combobox-toggle');
+        const getOptions = () => Array.from(dropdown.querySelectorAll('.patient-combobox-option'));
+
+        const setOpen = (open) => {
+            dropdown.classList.toggle('hidden', !open);
+            input.setAttribute('aria-expanded', open ? 'true' : 'false');
+        };
+
+        const filterOptions = (term) => {
+            const q = term.trim().toLowerCase();
+            let visible = 0;
+            getOptions().forEach(opt => {
+                const match = !q || opt.dataset.name.toLowerCase().includes(q);
+                opt.classList.toggle('hidden', !match);
+                if (match) visible++;
+            });
+            dropdown.classList.toggle('patient-combobox-empty', visible === 0);
+        };
+
+        const selectOption = (opt) => {
+            hidden.value = opt.dataset.id;
+            input.value = opt.dataset.name;
+            getOptions().forEach(o => o.classList.toggle('selected', o === opt));
+            setOpen(false);
+        };
+
+        const syncInputToSelection = () => {
+            const patient = state.patients.find(p => p.id === hidden.value);
+            if (patient) input.value = patient.name;
+        };
+
+        input.addEventListener('focus', () => {
+            setOpen(true);
+            filterOptions(input.value);
+        });
+
+        input.addEventListener('input', () => {
+            setOpen(true);
+            filterOptions(input.value);
+        });
+
+        toggle.addEventListener('click', (e) => {
+            e.preventDefault();
+            const isOpen = dropdown.classList.contains('hidden');
+            if (isOpen) {
+                input.focus();
+                setOpen(true);
+                filterOptions(input.value);
+            } else {
+                setOpen(false);
+            }
+        });
+
+        getOptions().forEach(opt => {
+            opt.addEventListener('mousedown', (e) => {
+                e.preventDefault();
+                selectOption(opt);
+            });
+        });
+
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                setOpen(false);
+                syncInputToSelection();
+                return;
+            }
+            if (!dropdown.classList.contains('hidden') && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
+                e.preventDefault();
+                const visible = getOptions().filter(o => !o.classList.contains('hidden'));
+                if (visible.length === 0) return;
+                const currentIdx = visible.findIndex(o => o.classList.contains('highlighted'));
+                let nextIdx = e.key === 'ArrowDown' ? currentIdx + 1 : currentIdx - 1;
+                if (nextIdx < 0) nextIdx = visible.length - 1;
+                if (nextIdx >= visible.length) nextIdx = 0;
+                visible.forEach(o => o.classList.remove('highlighted'));
+                visible[nextIdx].classList.add('highlighted');
+                visible[nextIdx].scrollIntoView({ block: 'nearest' });
+            }
+            if (e.key === 'Enter' && !dropdown.classList.contains('hidden')) {
+                e.preventDefault();
+                const highlighted = dropdown.querySelector('.patient-combobox-option.highlighted:not(.hidden)');
+                const visible = getOptions().filter(o => !o.classList.contains('hidden'));
+                const target = highlighted || visible[0];
+                if (target) selectOption(target);
+            }
+        });
+
+        input.addEventListener('blur', () => {
+            setTimeout(() => {
+                if (!root.contains(document.activeElement)) {
+                    setOpen(false);
+                    const typed = input.value.trim().toLowerCase();
+                    const exact = state.patients.find(p => p.name.toLowerCase() === typed);
+                    if (exact) {
+                        hidden.value = exact.id;
+                        input.value = exact.name;
+                        getOptions().forEach(o => o.classList.toggle('selected', o.dataset.id === exact.id));
+                    } else {
+                        syncInputToSelection();
+                    }
+                    getOptions().forEach(o => o.classList.remove('highlighted'));
+                }
+            }, 150);
+        });
+    };
+
     const openNewAppointmentModal = () => {
         elements.modalTitle.innerText = 'Novo Agendamento';
         elements.modalBody.innerHTML = `
             <form id="appointmentForm">
                 <div class="form-group">
                     <label>Paciente</label>
-                    <select id="appPatient" required>
-                        ${state.patients.map(p => `<option value="${p.id}">${p.name}</option>`).join('')}
-                    </select>
+                    ${getPatientComboboxHTML()}
                 </div>
                 <div class="form-group">
                     <label>Profissional</label>
@@ -765,6 +915,7 @@
         `;
 
         elements.modalOverlay.classList.remove('hidden');
+        initPatientCombobox();
 
         // Toggle recurring count field
         const recurringSelect = document.getElementById('appRecurring');
@@ -905,9 +1056,7 @@
             <form id="editAppointmentForm">
                 <div class="form-group">
                     <label>Paciente</label>
-                    <select id="appPatient" required>
-                        ${state.patients.map(p => `<option value="${p.id}" ${p.id === app.patientId ? 'selected' : ''}>${p.name}</option>`).join('')}
-                    </select>
+                    ${getPatientComboboxHTML(app.patientId)}
                 </div>
                 <div class="form-group">
                     <label>Profissional</label>
@@ -948,6 +1097,7 @@
         `;
 
         elements.modalOverlay.classList.remove('hidden');
+        initPatientCombobox();
 
         const recurringSelect = document.getElementById('appRecurring');
         const countGroup = document.getElementById('editRecurringCountGroup');
