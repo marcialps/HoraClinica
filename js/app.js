@@ -933,7 +933,7 @@
         // Inicializar o dropdown dinâmico de pacientes
         const patientContainer = document.getElementById('patientSelectContainer');
         const patientOptions = state.patients.map(p => ({ id: p.id, name: p.name })).sort((a, b) => a.name.localeCompare(b.name));
-        initSearchableSelect(patientContainer, patientOptions, patientOptions[0]?.id || '', (id) => {
+        initSearchableSelect(patientContainer, patientOptions, '', (id) => {
             console.log("Paciente selecionado:", id);
         });
 
@@ -952,6 +952,19 @@
             e.preventDefault();
 
             const patientId = document.getElementById('appPatient').value;
+            if (!patientId) {
+                const searchInput = patientContainer.querySelector('.searchable-select-input');
+                if (searchInput) {
+                    searchInput.focus();
+                    searchInput.style.borderColor = '#ef4444';
+                    setTimeout(() => {
+                        searchInput.style.borderColor = '';
+                    }, 3000);
+                }
+                alert("Por favor, selecione um paciente na lista.");
+                return;
+            }
+
             const professionalId = document.getElementById('appProfessional').value;
             const startDate = document.getElementById('appDate').value;
             const appTime = document.getElementById('appTime').value;
