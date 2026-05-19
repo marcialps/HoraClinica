@@ -413,6 +413,163 @@
         return phone.replace(/\D/g, '');
     };
 
+    const initSearchableSelect = (containerEl, options, defaultValue, onSelect) => {
+        const hiddenInput = containerEl.querySelector('.searchable-select-hidden');
+        const searchInput = containerEl.querySelector('.searchable-select-input');
+        const dropdown = containerEl.querySelector('.searchable-select-dropdown');
+        const optionsContainer = containerEl.querySelector('.searchable-select-options');
+        const icon = containerEl.querySelector('.searchable-select-icon');
+
+        let selectedId = defaultValue || '';
+        let activeIndex = -1;
+        let filteredOptions = [...options];
+
+        // Normalização de strings sem acento para busca inteligente
+        const normalizeStr = (str) => {
+            return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+        };
+
+        const renderOptions = () => {
+            optionsContainer.innerHTML = '';
+            if (filteredOptions.length === 0) {
+                optionsContainer.innerHTML = `<div class="searchable-select-no-results">Nenhum paciente encontrado</div>`;
+                return;
+            }
+
+            filteredOptions.forEach((opt, idx) => {
+                const optEl = document.createElement('div');
+                optEl.className = 'searchable-select-option';
+                if (opt.id === selectedId) optEl.classList.add('selected');
+                if (idx === activeIndex) optEl.classList.add('active');
+                optEl.innerText = opt.name;
+                optEl.dataset.id = opt.id;
+
+                optEl.onclick = (e) => {
+                    e.stopPropagation();
+                    selectOption(opt);
+                };
+                optionsContainer.appendChild(optEl);
+            });
+        };
+
+        const filter = (term) => {
+            const normTerm = normalizeStr(term);
+            filteredOptions = options.filter(opt => normalizeStr(opt.name).includes(normTerm));
+            activeIndex = -1;
+            renderOptions();
+        };
+
+        const selectOption = (opt) => {
+            selectedId = opt.id;
+            hiddenInput.value = opt.id;
+            searchInput.value = opt.name;
+            closeDropdown();
+            if (onSelect) onSelect(opt.id);
+        };
+
+        const openDropdown = () => {
+            dropdown.classList.remove('hidden');
+            if (icon) icon.style.transform = 'translateY(-50%) rotate(180deg)';
+            filter(searchInput.value);
+            
+            // Centralizar no selecionado
+            const selectedEl = optionsContainer.querySelector('.selected');
+            if (selectedEl) {
+                selectedEl.scrollIntoView({ block: 'nearest' });
+            }
+        };
+
+        const closeDropdown = () => {
+            dropdown.classList.add('hidden');
+            if (icon) icon.style.transform = 'translateY(-50%) rotate(0deg)';
+            
+            // Se o texto não bater exatamente com um paciente, restaura o selecionado
+            const currentOpt = options.find(o => o.id === selectedId);
+            if (currentOpt) {
+                searchInput.value = currentOpt.name;
+            } else {
+                searchInput.value = '';
+            }
+        };
+
+        searchInput.onfocus = () => {
+            openDropdown();
+        };
+
+        searchInput.oninput = (e) => {
+            filter(e.target.value);
+            if (dropdown.classList.contains('hidden')) {
+                openDropdown();
+            }
+        };
+
+        // Fechar ao clicar fora
+        const handleOutsideClick = (e) => {
+            if (!containerEl.contains(e.target)) {
+                closeDropdown();
+            }
+        };
+        document.addEventListener('click', handleOutsideClick);
+
+        // Teclado
+        searchInput.onkeydown = (e) => {
+            if (dropdown.classList.contains('hidden')) {
+                if (e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'Enter') {
+                    openDropdown();
+                    e.preventDefault();
+                }
+                return;
+            }
+
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                activeIndex = (activeIndex + 1) % filteredOptions.length;
+                renderOptions();
+                scrollToActive();
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                activeIndex = (activeIndex - 1 + filteredOptions.length) % filteredOptions.length;
+                renderOptions();
+                scrollToActive();
+            } else if (e.key === 'Enter') {
+                e.preventDefault();
+                if (activeIndex >= 0 && activeIndex < filteredOptions.length) {
+                    selectOption(filteredOptions[activeIndex]);
+                } else if (filteredOptions.length > 0) {
+                    selectOption(filteredOptions[0]);
+                }
+            } else if (e.key === 'Escape') {
+                e.preventDefault();
+                closeDropdown();
+                searchInput.blur();
+            }
+        };
+
+        const scrollToActive = () => {
+            const activeEl = optionsContainer.querySelector('.searchable-select-option.active');
+            if (activeEl) {
+                activeEl.scrollIntoView({ block: 'nearest' });
+            }
+        };
+
+        // Limpeza do listener para evitar memory leak
+        const interval = setInterval(() => {
+            if (!document.body.contains(containerEl)) {
+                document.removeEventListener('click', handleOutsideClick);
+                clearInterval(interval);
+            }
+        }, 10000);
+
+        // Definir valor inicial se houver
+        const initialOpt = options.find(o => o.id === selectedId);
+        if (initialOpt) {
+            searchInput.value = initialOpt.name;
+            hiddenInput.value = initialOpt.id;
+        }
+
+        renderOptions();
+    };
+
     // Navigation
     const switchView = (view) => {
         state.currentView = view;
@@ -716,165 +873,22 @@
         return card;
     };
 
-    const escapeHtml = (str) => {
-        if (str == null) return '';
-        return String(str)
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;');
-    };
-
-    const getPatientComboboxHTML = (selectedId = '') => {
-        const defaultId = selectedId || (state.patients[0] ? state.patients[0].id : '');
-        const selected = state.patients.find(p => p.id === defaultId);
-        const displayName = selected ? selected.name : '';
-
-        if (state.patients.length === 0) {
-            return `<p style="color: var(--text-muted); font-size: 14px;">Nenhum paciente cadastrado. Cadastre um paciente antes de agendar.</p>`;
-        }
-
-        return `
-            <div class="patient-combobox">
-                <input type="hidden" id="appPatient" value="${escapeHtml(defaultId)}" required>
-                <div class="patient-combobox-control">
-                    <input type="text" class="patient-combobox-input" placeholder="Buscar ou selecionar paciente..." value="${escapeHtml(displayName)}" autocomplete="off" aria-autocomplete="list" aria-expanded="false">
-                    <button type="button" class="patient-combobox-toggle" tabindex="-1" aria-label="Abrir lista de pacientes">
-                        <i class="fas fa-chevron-down"></i>
-                    </button>
-                </div>
-                <ul class="patient-combobox-dropdown hidden" role="listbox">
-                    ${state.patients.map(p => `
-                        <li class="patient-combobox-option${p.id === defaultId ? ' selected' : ''}"
-                            role="option"
-                            data-id="${escapeHtml(p.id)}"
-                            data-name="${escapeHtml(p.name)}">${escapeHtml(p.name)}</li>
-                    `).join('')}
-                </ul>
-            </div>
-        `;
-    };
-
-    const initPatientCombobox = () => {
-        const root = document.querySelector('.patient-combobox');
-        if (!root) return;
-
-        const hidden = root.querySelector('#appPatient');
-        const input = root.querySelector('.patient-combobox-input');
-        const dropdown = root.querySelector('.patient-combobox-dropdown');
-        const toggle = root.querySelector('.patient-combobox-toggle');
-        const getOptions = () => Array.from(dropdown.querySelectorAll('.patient-combobox-option'));
-
-        const setOpen = (open) => {
-            dropdown.classList.toggle('hidden', !open);
-            input.setAttribute('aria-expanded', open ? 'true' : 'false');
-        };
-
-        const filterOptions = (term) => {
-            const q = term.trim().toLowerCase();
-            let visible = 0;
-            getOptions().forEach(opt => {
-                const match = !q || opt.dataset.name.toLowerCase().includes(q);
-                opt.classList.toggle('hidden', !match);
-                if (match) visible++;
-            });
-            dropdown.classList.toggle('patient-combobox-empty', visible === 0);
-        };
-
-        const selectOption = (opt) => {
-            hidden.value = opt.dataset.id;
-            input.value = opt.dataset.name;
-            getOptions().forEach(o => o.classList.toggle('selected', o === opt));
-            setOpen(false);
-        };
-
-        const syncInputToSelection = () => {
-            const patient = state.patients.find(p => p.id === hidden.value);
-            if (patient) input.value = patient.name;
-        };
-
-        input.addEventListener('focus', () => {
-            setOpen(true);
-            filterOptions(input.value);
-        });
-
-        input.addEventListener('input', () => {
-            setOpen(true);
-            filterOptions(input.value);
-        });
-
-        toggle.addEventListener('click', (e) => {
-            e.preventDefault();
-            const isOpen = dropdown.classList.contains('hidden');
-            if (isOpen) {
-                input.focus();
-                setOpen(true);
-                filterOptions(input.value);
-            } else {
-                setOpen(false);
-            }
-        });
-
-        getOptions().forEach(opt => {
-            opt.addEventListener('mousedown', (e) => {
-                e.preventDefault();
-                selectOption(opt);
-            });
-        });
-
-        input.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') {
-                setOpen(false);
-                syncInputToSelection();
-                return;
-            }
-            if (!dropdown.classList.contains('hidden') && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
-                e.preventDefault();
-                const visible = getOptions().filter(o => !o.classList.contains('hidden'));
-                if (visible.length === 0) return;
-                const currentIdx = visible.findIndex(o => o.classList.contains('highlighted'));
-                let nextIdx = e.key === 'ArrowDown' ? currentIdx + 1 : currentIdx - 1;
-                if (nextIdx < 0) nextIdx = visible.length - 1;
-                if (nextIdx >= visible.length) nextIdx = 0;
-                visible.forEach(o => o.classList.remove('highlighted'));
-                visible[nextIdx].classList.add('highlighted');
-                visible[nextIdx].scrollIntoView({ block: 'nearest' });
-            }
-            if (e.key === 'Enter' && !dropdown.classList.contains('hidden')) {
-                e.preventDefault();
-                const highlighted = dropdown.querySelector('.patient-combobox-option.highlighted:not(.hidden)');
-                const visible = getOptions().filter(o => !o.classList.contains('hidden'));
-                const target = highlighted || visible[0];
-                if (target) selectOption(target);
-            }
-        });
-
-        input.addEventListener('blur', () => {
-            setTimeout(() => {
-                if (!root.contains(document.activeElement)) {
-                    setOpen(false);
-                    const typed = input.value.trim().toLowerCase();
-                    const exact = state.patients.find(p => p.name.toLowerCase() === typed);
-                    if (exact) {
-                        hidden.value = exact.id;
-                        input.value = exact.name;
-                        getOptions().forEach(o => o.classList.toggle('selected', o.dataset.id === exact.id));
-                    } else {
-                        syncInputToSelection();
-                    }
-                    getOptions().forEach(o => o.classList.remove('highlighted'));
-                }
-            }, 150);
-        });
-    };
-
     const openNewAppointmentModal = () => {
         elements.modalTitle.innerText = 'Novo Agendamento';
         elements.modalBody.innerHTML = `
             <form id="appointmentForm">
                 <div class="form-group">
                     <label>Paciente</label>
-                    ${getPatientComboboxHTML()}
+                    <div class="searchable-select-container" id="patientSelectContainer">
+                        <input type="hidden" id="appPatient" class="searchable-select-hidden" required>
+                        <div class="searchable-select-trigger">
+                            <input type="text" class="searchable-select-input" placeholder="Buscar paciente..." autocomplete="off">
+                            <i class="fas fa-chevron-down searchable-select-icon"></i>
+                        </div>
+                        <div class="searchable-select-dropdown hidden">
+                            <div class="searchable-select-options"></div>
+                        </div>
+                    </div>
                 </div>
                 <div class="form-group">
                     <label>Profissional</label>
@@ -915,7 +929,13 @@
         `;
 
         elements.modalOverlay.classList.remove('hidden');
-        initPatientCombobox();
+
+        // Inicializar o dropdown dinâmico de pacientes
+        const patientContainer = document.getElementById('patientSelectContainer');
+        const patientOptions = state.patients.map(p => ({ id: p.id, name: p.name })).sort((a, b) => a.name.localeCompare(b.name));
+        initSearchableSelect(patientContainer, patientOptions, patientOptions[0]?.id || '', (id) => {
+            console.log("Paciente selecionado:", id);
+        });
 
         // Toggle recurring count field
         const recurringSelect = document.getElementById('appRecurring');
@@ -1056,7 +1076,16 @@
             <form id="editAppointmentForm">
                 <div class="form-group">
                     <label>Paciente</label>
-                    ${getPatientComboboxHTML(app.patientId)}
+                    <div class="searchable-select-container" id="patientSelectContainer">
+                        <input type="hidden" id="appPatient" class="searchable-select-hidden" value="${app.patientId}" required>
+                        <div class="searchable-select-trigger">
+                            <input type="text" class="searchable-select-input" placeholder="Buscar paciente..." autocomplete="off">
+                            <i class="fas fa-chevron-down searchable-select-icon"></i>
+                        </div>
+                        <div class="searchable-select-dropdown hidden">
+                            <div class="searchable-select-options"></div>
+                        </div>
+                    </div>
                 </div>
                 <div class="form-group">
                     <label>Profissional</label>
@@ -1097,7 +1126,13 @@
         `;
 
         elements.modalOverlay.classList.remove('hidden');
-        initPatientCombobox();
+
+        // Inicializar o dropdown dinâmico de pacientes com o valor atual pré-selecionado
+        const patientContainer = document.getElementById('patientSelectContainer');
+        const patientOptions = state.patients.map(p => ({ id: p.id, name: p.name })).sort((a, b) => a.name.localeCompare(b.name));
+        initSearchableSelect(patientContainer, patientOptions, app.patientId, (id) => {
+            console.log("Paciente selecionado na edição:", id);
+        });
 
         const recurringSelect = document.getElementById('appRecurring');
         const countGroup = document.getElementById('editRecurringCountGroup');

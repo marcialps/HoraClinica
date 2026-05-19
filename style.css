@@ -845,100 +845,104 @@ h1, h2, h3, .logo span {
     text-decoration: underline;
 }
 
-/* Combobox de paciente (agendamento) */
-.patient-combobox {
+/* Searchable Select Autocomplete Dropdown Component */
+.searchable-select-container {
     position: relative;
+    width: 100%;
 }
 
-.patient-combobox-control {
+.searchable-select-trigger {
     position: relative;
     display: flex;
     align-items: center;
+    width: 100%;
 }
 
-.patient-combobox-input {
+.searchable-select-input {
     width: 100%;
-    padding: 10px 40px 10px 14px;
+    padding: 10px 40px 10px 14px !important;
     border-radius: var(--radius-sm);
     border: 1px solid var(--border);
     font-family: inherit;
     font-size: 14px;
-    background: var(--surface);
-}
-
-.patient-combobox-input:focus {
     outline: none;
-    border-color: var(--primary);
-    box-shadow: 0 0 0 3px var(--primary-light);
+    transition: border-color 0.2s, box-shadow 0.2s;
+    background-color: var(--surface);
+    color: var(--text-main);
 }
 
-.patient-combobox-toggle {
+.searchable-select-input:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+}
+
+.searchable-select-icon {
     position: absolute;
-    right: 4px;
+    right: 14px;
     top: 50%;
     transform: translateY(-50%);
-    width: 32px;
-    height: 32px;
-    border: none;
-    background: transparent;
     color: var(--text-muted);
-    cursor: pointer;
-    border-radius: var(--radius-sm);
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    pointer-events: none;
+    transition: transform 0.2s ease;
+    font-size: 12px;
 }
 
-.patient-combobox-toggle:hover {
-    color: var(--primary);
-    background: var(--primary-light);
-}
-
-.patient-combobox-dropdown {
+.searchable-select-dropdown {
     position: absolute;
     top: calc(100% + 4px);
     left: 0;
     right: 0;
-    max-height: 220px;
-    overflow-y: auto;
-    margin: 0;
-    padding: 6px;
-    list-style: none;
-    background: var(--surface);
+    background-color: var(--surface);
     border: 1px solid var(--border);
     border-radius: var(--radius-sm);
-    box-shadow: var(--shadow-md);
-    z-index: 10;
+    box-shadow: var(--shadow-lg);
+    z-index: 1000;
+    max-height: 220px;
+    overflow-y: auto;
+    animation: slideDown 0.15s ease-out;
 }
 
-.patient-combobox-dropdown.patient-combobox-empty::after {
-    content: 'Nenhum paciente encontrado';
-    display: block;
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-8px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.searchable-select-options {
+    padding: 4px;
+}
+
+.searchable-select-option {
     padding: 10px 12px;
+    font-size: 14px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background-color 0.15s, color 0.15s;
+    color: var(--text-main);
+}
+
+.searchable-select-option:hover,
+.searchable-select-option.active {
+    background-color: var(--primary-light);
+    color: var(--primary);
+    font-weight: 500;
+}
+
+.searchable-select-option.selected {
+    background-color: var(--primary);
+    color: white;
+    font-weight: 600;
+}
+
+.searchable-select-no-results {
+    padding: 12px;
     font-size: 13px;
     color: var(--text-muted);
     text-align: center;
-}
-
-.patient-combobox-option {
-    padding: 10px 12px;
-    border-radius: 6px;
-    font-size: 14px;
-    cursor: pointer;
-    transition: background 0.15s;
-}
-
-.patient-combobox-option:hover,
-.patient-combobox-option.highlighted {
-    background: var(--primary-light);
-    color: var(--primary);
-}
-
-.patient-combobox-option.selected {
-    font-weight: 600;
-    color: var(--primary);
-}
-
-.patient-combobox-option.hidden {
-    display: none;
+    font-style: italic;
 }
