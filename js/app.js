@@ -1084,9 +1084,19 @@
                     return new Date(year, month - 1, day).getDay();
                 };
 
+                const normalizeTime = (t) => {
+                    if (!t) return '';
+                    return t.trim().padStart(5, '0');
+                };
+
                 let sequenceApps = [];
                 if (app.recurringGroupId) {
-                    sequenceApps = state.appointments.filter(a => a.date && a.recurringGroupId === app.recurringGroupId && a.date > app.date);
+                    sequenceApps = state.appointments.filter(a => 
+                        a.date && 
+                        a.recurringGroupId === app.recurringGroupId && 
+                        a.date > app.date &&
+                        (!a.status || a.status === 'scheduled')
+                    );
                 } else {
                     // Heuristic for legacy recurring appointments
                     const currentWeekday = getWeekday(app.date);
@@ -1095,9 +1105,10 @@
                         a.id !== app.id &&
                         a.patientId === app.patientId &&
                         a.professionalId === app.professionalId &&
-                        a.time === app.time &&
+                        normalizeTime(a.time) === normalizeTime(app.time) &&
                         a.date > app.date &&
-                        getWeekday(a.date) === currentWeekday
+                        getWeekday(a.date) === currentWeekday &&
+                        (!a.status || a.status === 'scheduled')
                     );
                 }
 
@@ -1118,14 +1129,14 @@
                                 <p style="font-size: 13px; color: var(--text-main); font-weight: 600; margin: 0 0 8px 0; display: flex; align-items: center; gap: 8px;">
                                     <i class="fas fa-redo-alt" style="color: var(--primary);"></i> Série Recorrente Detectada
                                 </p>
-                                <p style="font-size: 12px; color: var(--text-muted); margin: 0; line-height: 1.4;">Encontramos mais <strong>${sequenceApps.length} agendamentos futuros</strong> pertencentes a essa mesma sequência semanal.</p>
+                                <p style="font-size: 12px; color: var(--text-muted); margin: 0; line-height: 1.4;">Encontramos mais <strong>${sequenceApps.length} agendamentos futuros pendentes</strong> pertencentes a essa mesma sequência semanal (agendamentos antigos ou já ocorridos serão preservados).</p>
                             </div>
                         ` : ''}
 
                         <div style="display: flex; flex-direction: column; gap: 10px; width: 100%; margin-top: 10px;">
                             ${sequenceApps.length > 0 ? `
                                 <button id="btnDeleteSequence" class="btn-primary" style="background-color: #ef4444; justify-content: center; width: 100%;">
-                                    <i class="fas fa-trash-alt"></i> Excluir este e os futuros (${sequenceApps.length + 1})
+                                    <i class="fas fa-trash-alt"></i> Excluir este e futuros agendados (${sequenceApps.length + 1})
                                 </button>
                                 <button id="btnDeleteOnlyThis" class="btn-secondary" style="color: #ef4444; border-color: #fca5a5; justify-content: center; width: 100%;">
                                     <i class="fas fa-minus-circle"></i> Excluir apenas este agendamento
@@ -1142,21 +1153,57 @@
                     </div>
                 `;
 
+                // Batch deletion function
+                const batchDelete = async (ids) => {
+                    if (!state.currentClinicId) return;
+                    try {
+                        const batch = db.batch();
+                        ids.forEach(id => {
+                            const docRef = db.collection('clinics').doc(state.currentClinicId).collection('appointments').doc(id);
+                            batch.delete(docRef);
+                        });
+                        await batch.commit();
+                    } catch (e) {
+                        console.error("Erro ao deletar em lote:", e);
+                        alert("Erro ao excluir agendamentos.");
+                    }
+                };
+
+                const setDeletingState = (clickedBtnId) => {
+                    const btnIds = ['btnDeleteSequence', 'btnDeleteOnlyThis', 'btnConfirmDeleteSingle', 'btnCancelDelete'];
+                    btnIds.forEach(id => {
+                        const btn = document.getElementById(id);
+                        if (btn) {
+                            btn.disabled = true;
+                            if (id === clickedBtnId) {
+                                btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Excluindo...`;
+                                btn.style.opacity = '0.7';
+                            } else {
+                                btn.style.opacity = '0.4';
+                                btn.style.pointerEvents = 'none';
+                            }
+                        }
+                    });
+                };
+
                 // Attach handlers to confirmation modal buttons
                 if (sequenceApps.length > 0) {
                     document.getElementById('btnDeleteSequence').onclick = async () => {
-                        const toDelete = [app, ...sequenceApps];
-                        await Promise.all(toDelete.map(a => deleteData('appointments', a.id)));
+                        setDeletingState('btnDeleteSequence');
+                        const toDeleteIds = [app.id, ...sequenceApps.map(a => a.id)];
+                        await batchDelete(toDeleteIds);
                         elements.modalOverlay.classList.add('hidden');
                     };
 
                     document.getElementById('btnDeleteOnlyThis').onclick = async () => {
-                        await deleteData('appointments', app.id);
+                        setDeletingState('btnDeleteOnlyThis');
+                        await batchDelete([app.id]);
                         elements.modalOverlay.classList.add('hidden');
                     };
                 } else {
                     document.getElementById('btnConfirmDeleteSingle').onclick = async () => {
-                        await deleteData('appointments', app.id);
+                        setDeletingState('btnConfirmDeleteSingle');
+                        await batchDelete([app.id]);
                         elements.modalOverlay.classList.add('hidden');
                     };
                 }
