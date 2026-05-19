@@ -326,13 +326,13 @@
             const clinicRef = db.collection('clinics').doc(state.currentClinicId);
 
             const unsubPatients = clinicRef.collection('patients').onSnapshot(snapshot => {
-                state.patients = snapshot.docs.map(doc => doc.data());
+                state.patients = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                 if (state.currentUser) renderView();
             });
             unsubscribes.push(unsubPatients);
 
             const unsubProfs = clinicRef.collection('professionals').onSnapshot(snapshot => {
-                state.professionals = snapshot.docs.map(doc => doc.data());
+                state.professionals = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                 if (state.currentUser) {
                     populateProfFilter();
                     renderView();
@@ -343,7 +343,7 @@
             unsubscribes.push(unsubProfs);
 
             const unsubApps = clinicRef.collection('appointments').onSnapshot(snapshot => {
-                state.appointments = snapshot.docs.map(doc => doc.data());
+                state.appointments = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                 if (state.currentUser) {
                     renderView();
                 } else {
@@ -353,7 +353,7 @@
             unsubscribes.push(unsubApps);
 
             const unsubInsurances = clinicRef.collection('insurances').onSnapshot(snapshot => {
-                state.insurances = snapshot.docs.map(doc => doc.data());
+                state.insurances = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                 if (state.currentUser && state.currentView === 'pacientes') renderPacientes();
             });
             unsubscribes.push(unsubInsurances);
@@ -832,11 +832,11 @@
     const getAppointmentsForDay = (date, profId) => {
         const dateStr = formatDateISO(date);
         return state.appointments.filter(app => {
-            if (app.professionalId !== profId) return false;
+            if (app.professionalId != profId) return false;
 
             // Search filter
             if (state.agendaSearch) {
-                const patient = state.patients.find(p => p.id === app.patientId);
+                const patient = state.patients.find(p => p.id == app.patientId);
                 if (!patient || !patient.name.toLowerCase().includes(state.agendaSearch.toLowerCase())) {
                     return false;
                 }
@@ -863,7 +863,7 @@
         card.style.top = `${top}px`;
         card.style.height = `${height}px`;
 
-        const patient = state.patients.find(p => p.id === app.patientId);
+        const patient = state.patients.find(p => p.id == app.patientId);
         card.innerHTML = `
             <span class="time">${app.time} - ${addMinutes(app.time, height)}</span>
             <span class="patient">${patient ? patient.name : 'Desconhecido'}</span>
@@ -1019,8 +1019,8 @@
     };
 
     const openAppointmentDetails = (app) => {
-        const patient = state.patients.find(p => p.id === app.patientId);
-        const prof = state.professionals.find(p => p.id === app.professionalId);
+        const patient = state.patients.find(p => p.id == app.patientId);
+        const prof = state.professionals.find(p => p.id == app.professionalId);
 
         elements.modalTitle.innerText = 'Detalhes do Agendamento';
         elements.modalBody.innerHTML = `
@@ -1078,38 +1078,86 @@
         const deleteBtn = document.getElementById('deleteApp');
         if (deleteBtn) {
             deleteBtn.onclick = async () => {
-                const getWeekday = (dateStr) => {
-                    if (!dateStr) return null;
-                    const [year, month, day] = dateStr.split('-').map(Number);
-                    return new Date(year, month - 1, day).getDay();
+                const normalizeId = (id) => {
+                    if (id === null || id === undefined) return '';
+                    return String(id).trim();
                 };
 
                 const normalizeTime = (t) => {
                     if (!t) return '';
-                    return t.trim().padStart(5, '0');
+                    const parts = String(t).trim().split(':');
+                    if (parts.length === 0) return '';
+                    const hours = parts[0].padStart(2, '0');
+                    const minutes = (parts[1] || '00').padStart(2, '0');
+                    return `${hours}:${minutes}`;
+                };
+
+                const parseDateToTime = (dateStr) => {
+                    if (!dateStr) return 0;
+                    let year, month, day;
+                    if (dateStr.includes('-')) {
+                        [year, month, day] = dateStr.split('-').map(Number);
+                    } else if (dateStr.includes('/')) {
+                        [day, month, year] = dateStr.split('/').map(Number);
+                    } else {
+                        return 0;
+                    }
+                    return new Date(year, month - 1, day).getTime();
+                };
+
+                const getWeekday = (dateStr) => {
+                    if (!dateStr) return null;
+                    let year, month, day;
+                    if (dateStr.includes('-')) {
+                        [year, month, day] = dateStr.split('-').map(Number);
+                    } else if (dateStr.includes('/')) {
+                        [day, month, year] = dateStr.split('/').map(Number);
+                    } else {
+                        return null;
+                    }
+                    return new Date(year, month - 1, day).getDay();
                 };
 
                 let sequenceApps = [];
-                if (app.recurringGroupId) {
-                    sequenceApps = state.appointments.filter(a => 
-                        a.date && 
-                        a.recurringGroupId === app.recurringGroupId && 
-                        a.date > app.date &&
-                        (!a.status || a.status === 'scheduled')
-                    );
+                const appIdStr = normalizeId(app.id);
+                const appPatientIdStr = normalizeId(app.patientId);
+                const appProfessionalIdStr = normalizeId(app.professionalId);
+                const appTimeNorm = normalizeTime(app.time);
+                const appDateVal = parseDateToTime(app.date);
+                const currentWeekday = getWeekday(app.date);
+
+                const isFutureAndPending = (a) => {
+                    if (!a.date || normalizeId(a.id) === appIdStr) return false;
+                    const isFuture = parseDateToTime(a.date) > appDateVal;
+                    const isNotOccurred = !['present', 'absent', 'absent_notice', 'cancelled_prof'].includes(a.status);
+                    return isFuture && isNotOccurred;
+                };
+
+                if (app.recurringGroupId && String(app.recurringGroupId).trim() !== '' && String(app.recurringGroupId) !== 'null' && String(app.recurringGroupId) !== 'undefined') {
+                    sequenceApps = state.appointments.filter(a => {
+                        if (!isFutureAndPending(a)) return false;
+                        
+                        const sameGroup = (normalizeId(a.recurringGroupId) === normalizeId(app.recurringGroupId));
+                        const matchHeuristic = (
+                            normalizeId(a.patientId) === appPatientIdStr &&
+                            normalizeId(a.professionalId) === appProfessionalIdStr &&
+                            normalizeTime(a.time) === appTimeNorm &&
+                            getWeekday(a.date) === currentWeekday
+                        );
+                        
+                        return sameGroup || matchHeuristic;
+                    });
                 } else {
-                    // Heuristic for legacy recurring appointments
-                    const currentWeekday = getWeekday(app.date);
-                    sequenceApps = state.appointments.filter(a => 
-                        a.date &&
-                        a.id !== app.id &&
-                        a.patientId === app.patientId &&
-                        a.professionalId === app.professionalId &&
-                        normalizeTime(a.time) === normalizeTime(app.time) &&
-                        a.date > app.date &&
-                        getWeekday(a.date) === currentWeekday &&
-                        (!a.status || a.status === 'scheduled')
-                    );
+                    sequenceApps = state.appointments.filter(a => {
+                        if (!isFutureAndPending(a)) return false;
+                        
+                        return (
+                            normalizeId(a.patientId) === appPatientIdStr &&
+                            normalizeId(a.professionalId) === appProfessionalIdStr &&
+                            normalizeTime(a.time) === appTimeNorm &&
+                            getWeekday(a.date) === currentWeekday
+                        );
+                    });
                 }
 
                 // Show a premium confirmation screen inside the modal body!
@@ -1186,23 +1234,31 @@
                     });
                 };
 
+                const optimisticLocalDelete = (idsToDelete) => {
+                    state.appointments = state.appointments.filter(a => !idsToDelete.includes(a.id));
+                    renderView();
+                };
+
                 // Attach handlers to confirmation modal buttons
                 if (sequenceApps.length > 0) {
                     document.getElementById('btnDeleteSequence').onclick = async () => {
                         setDeletingState('btnDeleteSequence');
-                        const toDeleteIds = [app.id, ...sequenceApps.map(a => a.id)];
+                        const toDeleteIds = [app.id, ...sequenceApps.map(a => a.id)].filter(id => id);
+                        optimisticLocalDelete(toDeleteIds);
                         await batchDelete(toDeleteIds);
                         elements.modalOverlay.classList.add('hidden');
                     };
 
                     document.getElementById('btnDeleteOnlyThis').onclick = async () => {
                         setDeletingState('btnDeleteOnlyThis');
+                        optimisticLocalDelete([app.id]);
                         await batchDelete([app.id]);
                         elements.modalOverlay.classList.add('hidden');
                     };
                 } else {
                     document.getElementById('btnConfirmDeleteSingle').onclick = async () => {
                         setDeletingState('btnConfirmDeleteSingle');
+                        optimisticLocalDelete([app.id]);
                         await batchDelete([app.id]);
                         elements.modalOverlay.classList.add('hidden');
                     };
@@ -1235,7 +1291,7 @@
                 <div class="form-group">
                     <label>Profissional</label>
                     <select id="appProfessional" required>
-                        ${state.professionals.map(p => `<option value="${p.id}" ${p.id === app.professionalId ? 'selected' : ''}>${p.name}</option>`).join('')}
+                        ${state.professionals.map(p => `<option value="${p.id}" ${p.id == app.professionalId ? 'selected' : ''}>${p.name}</option>`).join('')}
                     </select>
                 </div>
                 <div class="form-group">
@@ -1839,16 +1895,16 @@
         const container = document.getElementById('reportResultsContainer');
 
         const filteredApps = state.appointments.filter(app => {
-            if (app.professionalId !== profId) return false;
+            if (app.professionalId != profId) return false;
             return app.date >= startDate && app.date <= endDate;
         });
 
         const total = filteredApps.length;
-        const present = filteredApps.filter(a => a.status === 'present').length;
-        const absent = filteredApps.filter(a => a.status === 'absent' || a.status === 'absent_notice').length;
+        const present = filteredApps.filter(a => a.status == 'present').length;
+        const absent = filteredApps.filter(a => a.status == 'absent' || a.status == 'absent_notice').length;
 
         const patients = filteredApps.map(a => {
-            const p = state.patients.find(pat => pat.id === a.patientId);
+            const p = state.patients.find(pat => pat.id == a.patientId);
             return {
                 name: p ? p.name : 'Desconhecido',
                 date: a.date,
@@ -1909,8 +1965,8 @@
                     ${patients.map(p => {
             const currentMonthStr = formatDateISO(new Date()).substring(0, 7);
             const monthlyCount = state.appointments.filter(app =>
-                app.patientId === p.patientId &&
-                app.status === 'present' &&
+                app.patientId == p.patientId &&
+                app.status == 'present' &&
                 app.date.startsWith(currentMonthStr)
             ).length;
 
