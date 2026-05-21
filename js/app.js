@@ -2136,20 +2136,20 @@
 
             // Hamburger menu mobile toggle
             if (elements.menuToggleBtn) {
-                elements.menuToggleBtn.onclick = (e) => {
+                elements.menuToggleBtn.addEventListener('click', (e) => {
                     e.stopPropagation();
                     elements.app.classList.toggle('sidebar-open');
-                };
+                });
             }
 
             // Close sidebar when clicking main content area
             const mainContentEl = document.querySelector('.content');
             if (mainContentEl) {
-                mainContentEl.onclick = () => {
+                mainContentEl.addEventListener('click', (e) => {
                     if (elements.app.classList.contains('sidebar-open')) {
                         elements.app.classList.remove('sidebar-open');
                     }
-                };
+                });
             }
 
             elements.prevDay.onclick = () => {

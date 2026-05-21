@@ -783,7 +783,7 @@ h1, h2, h3, .logo span {
 
 /* Hamburguer Button - Oculto no desktop */
 .menu-toggle-btn {
-    display: none;
+    display: none !important;
     background: transparent;
     border: none;
     color: var(--text-main);
@@ -874,9 +874,9 @@ h1, h2, h3, .logo span {
         animation: fadeIn 0.2s ease-out;
     }
 
-    /* Botão Hambúrguer Visível */
+    /* Botão Hambúrguer Visível apenas no mobile */
     .menu-toggle-btn {
-        display: flex;
+        display: flex !important;
         margin-right: 12px;
     }
 
