@@ -584,6 +584,9 @@
         elements.navLinks.forEach(link => {
             link.classList.toggle('active', link.dataset.view === view);
         });
+        if (elements.app) {
+            elements.app.classList.remove('sidebar-open');
+        }
         renderView();
     };
 
@@ -1457,7 +1460,7 @@
 
         elements.viewContent.innerHTML = `
             <div class="card" style="background: white; padding: 24px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; gap: 20px;">
+                <div class="view-header-row">
                     <h3 style="white-space: nowrap; margin: 0;">Lista de Pacientes</h3>
                     <div style="position: relative; flex: 1; max-width: 400px;">
                         <i class="fas fa-search" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-muted);"></i>
@@ -1599,7 +1602,7 @@
             elements.modalTitle.innerText = 'Editar Paciente';
             elements.modalBody.innerHTML = `
                 <form id="editPatientForm">
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                    <div class="grid-2-cols">
                         <div class="form-group" style="grid-column: span 2;"><label>Nome Completo</label><input type="text" id="pName" value="${patient.name}" required></div>
                         <div class="form-group"><label>Telefone</label><input type="text" id="pPhone" value="${patient.phone || ''}"></div>
                         <div class="form-group"><label>Responsável</label><input type="text" id="pResponsible" value="${patient.responsible || ''}"></div>
@@ -1635,7 +1638,7 @@
             elements.modalTitle.innerText = 'Novo Paciente';
             elements.modalBody.innerHTML = `
                 <form id="patientForm">
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                    <div class="grid-2-cols">
                         <div class="form-group" style="grid-column: span 2;"><label>Nome Completo</label><input type="text" id="pName" required></div>
                         <div class="form-group"><label>Telefone</label><input type="text" id="pPhone"></div>
                         <div class="form-group"><label>Responsável</label><input type="text" id="pResponsible"></div>
@@ -1684,7 +1687,7 @@
                     </div>
                 </div>
 
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                <div class="grid-2-cols" style="gap: 20px;">
                     <div class="detail-item">
                         <label style="display: block; font-size: 12px; color: var(--text-muted); margin-bottom: 4px; font-weight: 500;">TELEFONE</label>
                         <div style="font-weight: 600; color: var(--text-main);">
@@ -1742,7 +1745,7 @@
         elements.viewTitle.innerText = 'Gestão de Profissionais';
         elements.viewContent.innerHTML = `
             <div class="card" style="background: white; padding: 24px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
-                <div style="display: flex; justify-content: space-between; margin-bottom: 20px;">
+                <div class="view-header-row" style="margin-bottom: 20px;">
                     <h3>Equipe Médica</h3>
                     <button class="btn-primary" id="newProfBtn"><i class="fas fa-plus"></i> Novo Profissional</button>
                 </div>
@@ -1896,7 +1899,7 @@
         elements.modalTitle.innerText = `Relatório: ${prof.name}`;
         elements.modalBody.innerHTML = `
             <div class="detailed-report">
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px;">
+                <div class="grid-2-cols">
                     <div class="form-group">
                         <label>Data Inicial</label>
                         <input type="date" id="repStartDate" value="${formatDateISO(firstDay)}">
@@ -2082,6 +2085,7 @@
             // Map elements
             elements = {
                 app: document.getElementById('app'),
+                menuToggleBtn: document.getElementById('menuToggleBtn'),
                 viewContent: document.getElementById('viewContent'),
                 viewTitle: document.getElementById('viewTitle'),
                 navLinks: document.querySelectorAll('.nav-links li'),
@@ -2129,6 +2133,24 @@
             elements.navLinks.forEach(link => {
                 link.onclick = () => switchView(link.dataset.view);
             });
+
+            // Hamburger menu mobile toggle
+            if (elements.menuToggleBtn) {
+                elements.menuToggleBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    elements.app.classList.toggle('sidebar-open');
+                };
+            }
+
+            // Close sidebar when clicking main content area
+            const mainContentEl = document.querySelector('.content');
+            if (mainContentEl) {
+                mainContentEl.onclick = () => {
+                    if (elements.app.classList.contains('sidebar-open')) {
+                        elements.app.classList.remove('sidebar-open');
+                    }
+                };
+            }
 
             elements.prevDay.onclick = () => {
                 const isWeekView = state.currentView === 'agenda' &&

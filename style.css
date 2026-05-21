@@ -395,16 +395,7 @@ h1, h2, h3, .logo span {
     }
 }
 
-@media (max-width: 768px) {
-    .sidebar {
-        width: 100%;
-        height: auto;
-        padding: 10px;
-    }
-    .main-layout {
-        flex-direction: column;
-    }
-}
+
 .content {
     display: flex;
     flex-direction: column;
@@ -790,12 +781,244 @@ h1, h2, h3, .logo span {
     display: none !important;
 }
 
+/* Hamburguer Button - Oculto no desktop */
+.menu-toggle-btn {
+    display: none;
+    background: transparent;
+    border: none;
+    color: var(--text-main);
+    font-size: 20px;
+    cursor: pointer;
+    padding: 8px;
+    border-radius: var(--radius-sm);
+    transition: all 0.2s;
+    align-items: center;
+    justify-content: center;
+}
+
+.menu-toggle-btn:hover {
+    background-color: var(--primary-light);
+    color: var(--primary);
+}
+
+/* Grid de duas colunas padrão */
+.grid-2-cols {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+}
+
+/* Cabeçalho de visualização padrão */
+.view-header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+    gap: 20px;
+}
+
+/* Coluna de horários com fixação inteligente */
+.time-column {
+    position: sticky;
+    left: 0;
+    background-color: var(--surface) !important;
+    z-index: 10;
+    border-right: 1px solid var(--border);
+    box-shadow: 2px 0 5px rgba(0, 0, 0, 0.03);
+}
+
+/* Responsividade Geral */
 @media (max-width: 768px) {
     #app {
         grid-template-columns: 1fr;
+        position: relative;
+        height: 100vh;
+        overflow: hidden;
     }
+
+    .content {
+        position: relative;
+        height: 100vh;
+        overflow-y: auto;
+    }
+
+    /* Barra Lateral Off-Canvas */
     .sidebar {
-        display: none;
+        position: fixed;
+        left: -280px;
+        top: 0;
+        bottom: 0;
+        width: 260px;
+        z-index: 1000;
+        background: var(--surface);
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: var(--glass);
+        box-shadow: var(--shadow-lg);
+        transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        display: flex;
+        flex-direction: column;
+    }
+
+    #app.sidebar-open .sidebar {
+        left: 0;
+    }
+
+    /* Overlay escuro de desfoque ao abrir o menu lateral */
+    #app.sidebar-open .content::before {
+        content: '';
+        position: fixed;
+        inset: 0;
+        background: rgba(15, 23, 42, 0.4);
+        backdrop-filter: blur(4px);
+        z-index: 999;
+        animation: fadeIn 0.2s ease-out;
+    }
+
+    /* Botão Hambúrguer Visível */
+    .menu-toggle-btn {
+        display: flex;
+        margin-right: 12px;
+    }
+
+    /* Ajustes na Barra Superior */
+    .top-bar {
+        padding: 16px 20px;
+        flex-wrap: wrap;
+        gap: 12px;
+    }
+
+    .top-bar h1 {
+        font-size: 20px;
+        flex-grow: 1;
+        margin: 0;
+    }
+
+    .top-actions {
+        width: 100%;
+        flex-wrap: wrap;
+        gap: 10px;
+        justify-content: space-between;
+    }
+
+    .zoom-controls {
+        display: none !important; /* Esconder zoom no celular */
+    }
+
+    .date-picker {
+        width: 100%;
+        justify-content: space-between;
+        padding: 6px 12px;
+        margin: 0;
+    }
+
+    #currentDateDisplay {
+        min-width: unset;
+        flex-grow: 1;
+        font-size: 14px;
+    }
+
+    #agendaSearchContainer {
+        max-width: 100% !important;
+        width: 100%;
+        margin: 0;
+    }
+
+    .filters {
+        flex-grow: 1;
+        width: 100%;
+        margin: 0;
+    }
+
+    .filters select {
+        width: 100%;
+        padding: 10px 14px;
+        font-size: 14px;
+    }
+
+    #addAppointmentBtn {
+        width: 100%;
+        justify-content: center;
+        padding: 12px;
+        font-size: 14px;
+        margin: 0;
+    }
+
+    /* Ajuste de Margens e Padding de Conteúdo */
+    #viewContent {
+        padding: 12px;
+    }
+
+    /* Modais Responsivos */
+    .modal {
+        width: 95%;
+        max-height: 95vh;
+    }
+
+    .modal-body {
+        padding: 16px;
+    }
+
+    .modal-header {
+        padding: 16px 20px;
+    }
+
+    /* Ajustes na Tela de Login */
+    .login-screen {
+        padding: 16px;
+    }
+
+    .login-card {
+        padding: 24px 16px;
+        max-width: 100%;
+    }
+
+    .login-card h2 {
+        font-size: 20px;
+    }
+
+    .login-card p {
+        margin-bottom: 20px;
+    }
+
+    .prof-login-list {
+        grid-template-columns: 1fr;
+        gap: 8px;
+    }
+
+    .prof-login-btn {
+        padding: 14px;
+        font-size: 14px;
+    }
+}
+
+/* Responsividade para telas muito pequenas */
+@media (max-width: 576px) {
+    /* Empilhamento de Grids e Cabeçalhos */
+    .grid-2-cols {
+        grid-template-columns: 1fr;
+        gap: 12px;
+    }
+
+    .view-header-row {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 12px;
+        margin-bottom: 16px;
+    }
+
+    .view-header-row h3 {
+        text-align: center;
+        font-size: 18px;
+    }
+
+    .view-header-row button {
+        width: 100%;
+        justify-content: center;
+    }
+
+    /* Ocultar elementos desnecessários da Landing Page no mobile */
+    .floating-card {
+        display: none !important;
     }
 }
 .checkbox-container {
