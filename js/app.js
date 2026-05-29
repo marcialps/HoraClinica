@@ -67,6 +67,9 @@
     };
 
     const renderLoginScreen = () => {
+        // UI estrutural pronta — não manter splash bloqueando a tela inteira
+        hideLoadingScreen();
+
         // Recover clinic from URL if state is lost
         if (!state.currentClinicId) {
             const urlParams = new URLSearchParams(window.location.search || window.location.hash.substring(window.location.hash.indexOf('?')));
@@ -2159,13 +2162,14 @@
             // 2. Firebase check
             if (typeof db === 'undefined') {
                 console.error("Firebase: Banco de dados não detectado. Verifique sua conexão.");
+                hideLoadingScreen();
                 renderLandingPage();
                 return;
             }
 
-            // 3. Migration and Initial Listeners
-            await migrateToFirebase();
+            // 3. Listeners imediatos; migração local em segundo plano (não bloqueia a UI)
             setupListeners();
+            migrateToFirebase().catch(err => console.error('Migração local:', err));
 
             // Event Listeners
             elements.navLinks.forEach(link => {
@@ -2261,6 +2265,7 @@
             if (!state.currentUser) {
                 renderLoginScreen();
             } else {
+                hideLoadingScreen();
                 elements.app.classList.remove('hidden');
                 document.getElementById('landingPage').classList.add('hidden');
                 updateUserUI();
@@ -2269,6 +2274,7 @@
             }
         } catch (error) {
             console.error("Erro crítico na inicialização:", error);
+            hideLoadingScreen();
             // Show landing page as fallback if everything crashes
             document.getElementById('landingPage').classList.remove('hidden');
         }
