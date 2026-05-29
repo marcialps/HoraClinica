@@ -736,7 +736,10 @@ h1, h2, h3, .logo span {
     box-shadow: var(--shadow-lg);
     width: 100%;
     max-width: 400px;
+    max-height: 90vh;
+    overflow-y: auto;
     text-align: center;
+    box-sizing: border-box;
 }
 
 .login-card h2 {
@@ -970,6 +973,8 @@ h1, h2, h3, .logo span {
     .login-card {
         padding: 24px 16px;
         max-width: 100%;
+        max-height: calc(100vh - 60px);
+        overflow-y: auto;
     }
 
     .login-card h2 {
