@@ -13,8 +13,33 @@
         columnWidth: 150,
         agendaSearch: '',
         recentlyDeletedIds: new Set(),
-        isFirebaseLoaded: false // Flag: Firebase ainda não respondeu
+        isFirebaseLoaded: false, // Lista completa de clínicas carregada
+        currentClinic: null, // Clínica ativa (link direto ?clinic=)
+        isClinicLoginReady: false // Metadados da clínica do link já consultados
     };
+
+    const CLINIC_CACHE_KEY = 'hc_clinic_v1';
+
+    const getClinicCache = (id) => {
+        try {
+            const cache = JSON.parse(sessionStorage.getItem(CLINIC_CACHE_KEY) || '{}');
+            return cache[id] || null;
+        } catch {
+            return null;
+        }
+    };
+
+    const setClinicCache = (clinic) => {
+        if (!clinic?.id) return;
+        try {
+            const cache = JSON.parse(sessionStorage.getItem(CLINIC_CACHE_KEY) || '{}');
+            cache[clinic.id] = { id: clinic.id, name: clinic.name, adminPass: clinic.adminPass };
+            sessionStorage.setItem(CLINIC_CACHE_KEY, JSON.stringify(cache));
+        } catch { /* ignore */ }
+    };
+
+    const getActiveClinic = () =>
+        state.currentClinic || state.clinics.find(c => c.id === state.currentClinicId);
 
     // DOM Elements - to be populated on init
     let elements = {};
@@ -90,7 +115,7 @@
 
         // PRIORITY 1: Clinic ID is present (from URL or previous selection)
         if (state.currentClinicId) {
-            const clinic = state.clinics.find(c => c.id === state.currentClinicId);
+            const clinic = getActiveClinic();
 
             if (clinic) {
                 document.getElementById('loginWelcome').innerText = `Bem-vindo à ${clinic.name}`;
@@ -98,8 +123,7 @@
                 document.getElementById('clinicLogoArea').innerHTML = `<div style="width: 80px; height: 80px; background: var(--primary); border-radius: 20px; display: flex; align-items: center; justify-content: center; margin: 0 auto; color: white; font-size: 32px; font-weight: bold; box-shadow: 0 10px 20px rgba(37, 99, 235, 0.2);">${clinic.name.substring(0, 1).toUpperCase()}</div>`;
 
                 renderProfessionalList(profList);
-            } else if (!state.isFirebaseLoaded) {
-                // Firebase ainda está carregando — mostrar spinner, não erro
+            } else if (!state.isClinicLoginReady) {
                 document.getElementById('loginWelcome').innerText = 'Carregando clínica...';
                 document.getElementById('loginSubtitle').innerText = 'Aguarde um momento.';
                 document.getElementById('clinicLogoArea').innerHTML = `
@@ -237,12 +261,12 @@
             const id = e.target.value;
             if (id) {
                 state.currentClinicId = id;
-                // Sync URL
+                state.currentClinic = getClinicCache(id);
                 const url = new URL(window.location.href);
                 url.searchParams.set('clinic', id);
                 window.history.pushState({}, '', url.toString());
 
-                setupListeners(); // Re-setup for new clinic
+                setupListeners();
                 renderLoginScreen();
             }
         };
@@ -251,7 +275,8 @@
     const updateAdminLoginHandler = () => {
         document.getElementById('loginAdmin').onclick = () => {
             if (!state.currentClinicId) return;
-            const clinic = state.clinics.find(c => c.id === state.currentClinicId);
+            const clinic = getActiveClinic();
+            if (!clinic) return;
             elements.modalTitle.innerText = 'Acesso Administrativo';
             elements.modalBody.innerHTML = `
                 <div style="text-align: center; margin-bottom: 20px;">
@@ -310,7 +335,8 @@
         if (state.currentUser.role === 'super-admin') {
             switchView('super-admin');
         } else {
-            const clinic = state.clinics.find(c => c.id === state.currentClinicId);
+            setupListeners(); // pacientes, agenda etc. só após login
+            const clinic = getActiveClinic();
             document.querySelector('.logo span').innerText = clinic ? clinic.name : 'HoraClinica';
             populateProfFilter();
             switchView('agenda');
@@ -332,80 +358,134 @@
     // dos listeners Firebase (patients, professionals, appointments disparam juntos)
     const renderViewDebounced = debounce(() => renderView(), 60);
 
-    // Load Data (Firebase Real-time)
-    const setupListeners = () => {
-        // Clear previous listeners
-        unsubscribes.forEach(unsub => unsub());
-        unsubscribes = [];
-        state.isFirebaseLoaded = false;
+    const upsertClinicInState = (clinic) => {
+        if (!clinic?.id) return;
+        state.currentClinic = clinic;
+        const idx = state.clinics.findIndex(c => c.id === clinic.id);
+        if (idx >= 0) state.clinics[idx] = clinic;
+        else state.clinics.push(clinic);
+        setClinicCache(clinic);
+    };
 
-        // Clear recently deleted cache when switching/re-setting listeners
-        state.recentlyDeletedIds.clear();
+    const onClinicsListSnapshot = (snapshot) => {
+        state.clinics = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+        state.isFirebaseLoaded = true;
+        hideLoadingScreen();
 
-        // 1. Clinics Listener (Always active)
-        const unsubClinics = db.collection('clinics').onSnapshot(snapshot => {
-            state.clinics = snapshot.docs.map(doc => doc.data());
-            state.isFirebaseLoaded = true;
-            hideLoadingScreen();
+        if (state.currentUser?.role === 'super-admin') {
+            renderSuperAdmin();
+        }
 
-            if (state.currentUser && state.currentUser.role === 'super-admin') {
-                renderSuperAdmin();
+        if (!state.currentUser) {
+            const landingVisible = !document.getElementById('landingPage').classList.contains('hidden');
+            if (state.currentClinicId || !landingVisible) {
+                renderLoginScreen();
             }
+        }
+    };
 
-            // If we are at the login/landing stage
-            if (!state.currentUser) {
-                const landingVisible = !document.getElementById('landingPage').classList.contains('hidden');
+    const setupClinicsListListener = () => {
+        state.isFirebaseLoaded = false;
+        const unsub = db.collection('clinics').onSnapshot(onClinicsListSnapshot);
+        unsubscribes.push(unsub);
+    };
 
-                // Only auto-switch to login screen if:
-                // 1. We have a specific clinic in the URL
-                // 2. OR we are already in the login screen (not landing)
-                if (state.currentClinicId || !landingVisible) {
-                    renderLoginScreen();
-                }
+    const applyClinicDoc = (doc) => {
+        state.isClinicLoginReady = true;
+        if (doc && doc.exists) {
+            upsertClinicInState({ ...doc.data(), id: doc.id });
+        } else {
+            state.currentClinic = null;
+        }
+        if (!state.currentUser) renderLoginScreen();
+    };
+
+    // Login por link: só 1 documento de clínica + profissionais (sem pacientes/agenda)
+    const setupClinicLoginListeners = (clinicId) => {
+        state.isClinicLoginReady = false;
+        const clinicRef = db.collection('clinics').doc(clinicId);
+
+        clinicRef.get().then(applyClinicDoc).catch(err => {
+            console.error('Erro ao carregar clínica:', err);
+            state.isClinicLoginReady = true;
+            if (!state.currentUser) renderLoginScreen();
+        });
+
+        const unsubClinic = clinicRef.onSnapshot(doc => applyClinicDoc(doc), err => {
+            console.error('Erro ao escutar clínica:', err);
+            state.isClinicLoginReady = true;
+            if (!state.currentUser) renderLoginScreen();
+        });
+        unsubscribes.push(unsubClinic);
+
+        const unsubProfs = clinicRef.collection('professionals').onSnapshot(snapshot => {
+            state.professionals = snapshot.docs.map(d => ({ ...d.data(), id: d.id }));
+            if (!state.currentUser) renderLoginScreen();
+        });
+        unsubscribes.push(unsubProfs);
+    };
+
+    // Após login: coleções completas da clínica
+    const setupClinicAppListeners = (clinicId) => {
+        const clinicRef = db.collection('clinics').doc(clinicId);
+
+        if (!state.currentClinic) {
+            const unsubClinic = clinicRef.onSnapshot(doc => {
+                if (doc.exists) upsertClinicInState({ ...doc.data(), id: doc.id });
+            });
+            unsubscribes.push(unsubClinic);
+        }
+
+        const unsubPatients = clinicRef.collection('patients').onSnapshot(snapshot => {
+            state.patients = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+            if (state.currentUser) renderViewDebounced();
+        });
+        unsubscribes.push(unsubPatients);
+
+        const unsubProfs = clinicRef.collection('professionals').onSnapshot(snapshot => {
+            state.professionals = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+            if (state.currentUser) {
+                populateProfFilter();
+                renderViewDebounced();
             }
         });
-        unsubscribes.push(unsubClinics);
+        unsubscribes.push(unsubProfs);
 
-        // 2. Clinic Data Listeners (Only if clinic selected)
+        const unsubApps = clinicRef.collection('appointments').onSnapshot(snapshot => {
+            const loadedApps = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+            state.appointments = loadedApps.filter(app => {
+                const appNormId = app.id != null ? String(app.id).trim() : '';
+                return !state.recentlyDeletedIds.has(appNormId);
+            });
+            if (state.currentUser) renderViewDebounced();
+        });
+        unsubscribes.push(unsubApps);
+
+        const unsubInsurances = clinicRef.collection('insurances').onSnapshot(snapshot => {
+            state.insurances = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+            if (state.currentUser && state.currentView === 'pacientes') renderPacientes();
+        });
+        unsubscribes.push(unsubInsurances);
+    };
+
+    const setupListeners = () => {
+        unsubscribes.forEach(unsub => unsub());
+        unsubscribes = [];
+        state.recentlyDeletedIds.clear();
+
+        const isSuperAdmin = state.currentUser?.role === 'super-admin';
+        const needsClinicList = isSuperAdmin || !state.currentClinicId;
+
+        if (needsClinicList) {
+            setupClinicsListListener();
+        }
+
         if (state.currentClinicId) {
-            const clinicRef = db.collection('clinics').doc(state.currentClinicId);
-
-            const unsubPatients = clinicRef.collection('patients').onSnapshot(snapshot => {
-                state.patients = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
-                if (state.currentUser) renderViewDebounced();
-            });
-            unsubscribes.push(unsubPatients);
-
-            const unsubProfs = clinicRef.collection('professionals').onSnapshot(snapshot => {
-                state.professionals = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
-                if (state.currentUser) {
-                    populateProfFilter();
-                    renderViewDebounced();
-                } else {
-                    renderLoginScreen();
-                }
-            });
-            unsubscribes.push(unsubProfs);
-
-            const unsubApps = clinicRef.collection('appointments').onSnapshot(snapshot => {
-                const loadedApps = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
-                state.appointments = loadedApps.filter(app => {
-                    const appNormId = app.id !== null && app.id !== undefined ? String(app.id).trim() : '';
-                    return !state.recentlyDeletedIds.has(appNormId);
-                });
-                if (state.currentUser) {
-                    renderViewDebounced();
-                } else {
-                    renderLoginScreen();
-                }
-            });
-            unsubscribes.push(unsubApps);
-
-            const unsubInsurances = clinicRef.collection('insurances').onSnapshot(snapshot => {
-                state.insurances = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
-                if (state.currentUser && state.currentView === 'pacientes') renderPacientes();
-            });
-            unsubscribes.push(unsubInsurances);
+            if (state.currentUser && !isSuperAdmin) {
+                setupClinicAppListeners(state.currentClinicId);
+            } else if (!state.currentUser) {
+                setupClinicLoginListeners(state.currentClinicId);
+            }
         }
     };
 
@@ -2107,7 +2187,7 @@
 
         // Update clinic info in sidebar
         if (state.currentClinicId) {
-            const clinic = state.clinics.find(c => c.id === state.currentClinicId);
+            const clinic = getActiveClinic();
             if (clinic && elements.sidebarClinic) {
                 elements.sidebarClinic.innerHTML = `
                     <small> </small>
@@ -2157,6 +2237,8 @@
             const urlClinicId = urlParams.get('clinic');
             if (urlClinicId) {
                 state.currentClinicId = urlClinicId;
+                const cached = getClinicCache(urlClinicId);
+                if (cached) upsertClinicInState(cached);
             }
 
             // 2. Firebase check
