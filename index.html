@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>HoraClinica - Gestão de Clínica</title>
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style.css?v=2.3">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link
@@ -20,6 +20,16 @@
 </head>
 
 <body>
+    <!-- Loading Screen - Aparece instantaneamente enquanto o Firebase carrega -->
+    <div id="loadingScreen">
+        <div class="loading-logo">
+            <i class="fas fa-clinic-medical"></i>
+            <span>HoraClinica</span>
+        </div>
+        <div class="loading-spinner"></div>
+        <span class="loading-text">Carregando...</span>
+    </div>
+
     <!-- Landing Page (Apresentação) -->
     <div id="landingPage" class="landing-page hidden">
         <nav class="landing-nav">
@@ -208,7 +218,7 @@
         </div>
     </div>
 
-    <script src="js/app.js?v=2.1"></script>
+    <script src="js/app.js?v=2.3"></script>
 </body>
 
 </html>

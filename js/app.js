@@ -12,12 +12,33 @@
         insurances: [],
         columnWidth: 150,
         agendaSearch: '',
-        recentlyDeletedIds: new Set()
+        recentlyDeletedIds: new Set(),
+        isFirebaseLoaded: false // Flag: Firebase ainda não respondeu
     };
 
     // DOM Elements - to be populated on init
     let elements = {};
     let unsubscribes = []; // For Firebase listeners
+
+    // Utilitário: debounce para evitar múltiplos renders simultâneos
+    const debounce = (fn, delay) => {
+        let timer;
+        return (...args) => {
+            clearTimeout(timer);
+            timer = setTimeout(() => fn(...args), delay);
+        };
+    };
+
+    // Esconde a tela de loading com fade suave
+    const hideLoadingScreen = () => {
+        const ls = document.getElementById('loadingScreen');
+        if (ls && !ls.classList.contains('fade-out')) {
+            ls.classList.add('fade-out');
+            // Remove do DOM depois da transição para não bloquear interação
+            setTimeout(() => { if (ls.parentNode) ls.parentNode.removeChild(ls); }, 450);
+        }
+    };
+
 
     const migrateToFirebase = async () => {
         const localClinics = JSON.parse(localStorage.getItem('hc_clinics'));
@@ -74,6 +95,16 @@
                 document.getElementById('clinicLogoArea').innerHTML = `<div style="width: 80px; height: 80px; background: var(--primary); border-radius: 20px; display: flex; align-items: center; justify-content: center; margin: 0 auto; color: white; font-size: 32px; font-weight: bold; box-shadow: 0 10px 20px rgba(37, 99, 235, 0.2);">${clinic.name.substring(0, 1).toUpperCase()}</div>`;
 
                 renderProfessionalList(profList);
+            } else if (!state.isFirebaseLoaded) {
+                // Firebase ainda está carregando — mostrar spinner, não erro
+                document.getElementById('loginWelcome').innerText = 'Carregando clínica...';
+                document.getElementById('loginSubtitle').innerText = 'Aguarde um momento.';
+                document.getElementById('clinicLogoArea').innerHTML = `
+                    <div class="login-card-loading">
+                        <div class="loading-spinner"></div>
+                    </div>`;
+                profList.innerHTML = '';
+                document.getElementById('loginAdmin').classList.add('hidden');
             } else {
                 document.getElementById('loginWelcome').innerText = 'Clínica não encontrada';
                 document.getElementById('loginSubtitle').innerText = 'O link acessado é inválido ou a clínica foi removida.';
@@ -294,11 +325,16 @@
         });
     };
 
+    // renderView com debounce para evitar múltiplos re-renders simultâneos
+    // dos listeners Firebase (patients, professionals, appointments disparam juntos)
+    const renderViewDebounced = debounce(() => renderView(), 60);
+
     // Load Data (Firebase Real-time)
     const setupListeners = () => {
         // Clear previous listeners
         unsubscribes.forEach(unsub => unsub());
         unsubscribes = [];
+        state.isFirebaseLoaded = false;
 
         // Clear recently deleted cache when switching/re-setting listeners
         state.recentlyDeletedIds.clear();
@@ -306,6 +342,8 @@
         // 1. Clinics Listener (Always active)
         const unsubClinics = db.collection('clinics').onSnapshot(snapshot => {
             state.clinics = snapshot.docs.map(doc => doc.data());
+            state.isFirebaseLoaded = true;
+            hideLoadingScreen();
 
             if (state.currentUser && state.currentUser.role === 'super-admin') {
                 renderSuperAdmin();
@@ -331,7 +369,7 @@
 
             const unsubPatients = clinicRef.collection('patients').onSnapshot(snapshot => {
                 state.patients = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
-                if (state.currentUser) renderView();
+                if (state.currentUser) renderViewDebounced();
             });
             unsubscribes.push(unsubPatients);
 
@@ -339,7 +377,7 @@
                 state.professionals = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
                 if (state.currentUser) {
                     populateProfFilter();
-                    renderView();
+                    renderViewDebounced();
                 } else {
                     renderLoginScreen();
                 }
@@ -353,7 +391,7 @@
                     return !state.recentlyDeletedIds.has(appNormId);
                 });
                 if (state.currentUser) {
-                    renderView();
+                    renderViewDebounced();
                 } else {
                     renderLoginScreen();
                 }
