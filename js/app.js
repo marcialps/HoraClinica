@@ -975,7 +975,15 @@
             }
 
             if (app.date === dateStr) return true;
+
             if (app.recurring && app.recurringType === 'weekly') {
+                const groupId = app.recurringGroupId ? String(app.recurringGroupId).trim() : '';
+                const groupCount = state.appointments.filter(a => a.recurringGroupId && String(a.recurringGroupId).trim() === groupId).length;
+                // If the recurring series already has one document per occurrence, do not "project" additional dates.
+                if (groupId && groupCount > 1) {
+                    return false;
+                }
+
                 const [y, m, d] = app.date.split('-').map(Number);
                 const appDate = new Date(y, m - 1, d);
                 return date >= appDate && date.getDay() === appDate.getDay();
