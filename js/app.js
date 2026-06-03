@@ -327,6 +327,10 @@
     };
 
     const finishLogin = () => {
+        // Persistir sessão em localStorage
+        localStorage.setItem('hc_currentUser', JSON.stringify(state.currentUser));
+        localStorage.setItem('hc_currentClinicId', state.currentClinicId || '');
+        
         document.getElementById('loginScreen').classList.add('hidden');
         document.getElementById('landingPage').classList.add('hidden');
         document.getElementById('app').classList.remove('hidden');
@@ -2240,10 +2244,25 @@
                 agendaPatientSearch: document.getElementById('agendaPatientSearch')
             };
 
-            // 1. Detect Clinic from URL immediately
+            // 1. Recover user session from localStorage if available
+            const savedUser = localStorage.getItem('hc_currentUser');
+            const savedClinicId = localStorage.getItem('hc_currentClinicId');
+            if (savedUser) {
+                try {
+                    state.currentUser = JSON.parse(savedUser);
+                    state.currentClinicId = savedClinicId || null;
+                    console.log("Sessão recuperada:", state.currentUser.name);
+                } catch (e) {
+                    console.error("Erro ao recuperar sessão:", e);
+                    localStorage.removeItem('hc_currentUser');
+                    localStorage.removeItem('hc_currentClinicId');
+                }
+            }
+
+            // 2. Detect Clinic from URL immediately
             const urlParams = new URLSearchParams(window.location.search || window.location.hash.substring(window.location.hash.indexOf('?')));
             const urlClinicId = urlParams.get('clinic');
-            if (urlClinicId) {
+            if (urlClinicId && !state.currentClinicId) {
                 state.currentClinicId = urlClinicId;
                 const cached = getClinicCache(urlClinicId);
                 if (cached) upsertClinicInState(cached);
@@ -2348,6 +2367,10 @@
             elements.closeModal.onclick = () => elements.modalOverlay.classList.add('hidden');
             elements.logoutBtn.onclick = () => {
                 state.currentUser = null;
+                state.currentClinicId = null;
+                // Limpar localStorage ao fazer logout
+                localStorage.removeItem('hc_currentUser');
+                localStorage.removeItem('hc_currentClinicId');
                 setupListeners();
                 renderLoginScreen();
             };
