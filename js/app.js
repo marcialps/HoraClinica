@@ -2170,8 +2170,12 @@
                             <div style="font-size: 10px; color: #2563eb; text-transform: uppercase; font-weight: 600;">Agendado</div>
                         </div>
                         <div style="background: #fef2f2; border: 1px solid #fecaca; padding: 8px 12px; border-radius: 8px; flex: 1; text-align: center;">
-                            <div style="font-size: 18px; font-weight: 700; color: #dc2626;">${filteredApps.filter(a => a.status === 'cancelled' || a.status === 'cancelled_prof').length}</div>
-                            <div style="font-size: 10px; color: #dc2626; text-transform: uppercase; font-weight: 600;">Cancelado</div>
+                            <div style="font-size: 18px; font-weight: 700; color: #dc2626;">${filteredApps.filter(a => a.status === 'absent' || a.status === 'absent_notice').length}</div>
+                            <div style="font-size: 10px; color: #dc2626; text-transform: uppercase; font-weight: 600;">Faltou</div>
+                        </div>
+                        <div style="background: #faf5ff; border: 1px solid #e9d5ff; padding: 8px 12px; border-radius: 8px; flex: 1; text-align: center;">
+                            <div style="font-size: 18px; font-weight: 700; color: #9333ea;">${filteredApps.filter(a => a.status === 'cancelled' || a.status === 'cancelled_prof').length}</div>
+                            <div style="font-size: 10px; color: #9333ea; text-transform: uppercase; font-weight: 600;">Cancelado</div>
                         </div>
                     </div>
                     
