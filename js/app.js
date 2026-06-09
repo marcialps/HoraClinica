@@ -1994,6 +1994,29 @@
                 </div>
             </div>
 
+            <div class="card" style="background: white; padding: 32px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); margin-bottom: 24px;">
+                <h3 style="margin-bottom: 24px;">Relatório por Paciente</h3>
+                <div style="display: grid; grid-template-columns: 1fr 140px 140px 140px; gap: 16px; align-items: flex-end;">
+                    <div class="form-group">
+                        <label style="display: block; font-size: 13px; font-weight: 600; margin-bottom: 8px; color: var(--text-main);">Paciente</label>
+                        <input type="text" id="patientSearchInput" placeholder="Buscar paciente..." style="width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 14px;">
+                        <div id="patientSearchDropdown" style="display: none; position: absolute; background: white; border: 1px solid var(--border); border-radius: 8px; max-height: 250px; overflow-y: auto; z-index: 1000; width: 100%; margin-top: 4px;"></div>
+                    </div>
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label style="display: block; font-size: 13px; font-weight: 600; margin-bottom: 8px; color: var(--text-main);">Data Inicial</label>
+                        <input type="date" id="patientStartDate" style="width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 14px;">
+                    </div>
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label style="display: block; font-size: 13px; font-weight: 600; margin-bottom: 8px; color: var(--text-main);">Data Final</label>
+                        <input type="date" id="patientEndDate" style="width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 14px;">
+                    </div>
+                    <button id="generatePatientReportBtn" class="btn-primary" style="width: 100%; padding: 10px 12px; justify-content: center;">
+                        <i class="fas fa-sync-alt"></i> Gerar
+                    </button>
+                </div>
+                <input type="hidden" id="selectedPatientId">
+            </div>
+
             <div class="card" style="background: white; padding: 32px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
                 <h3 style="margin-bottom: 24px;">Desempenho por Profissional</h3>
                 <div style="display: flex; flex-direction: column; gap: 20px;">
@@ -2018,6 +2041,73 @@
         // Attach listeners
         document.querySelectorAll('.prof-report-link').forEach(link => {
             link.onclick = () => openDetailedProfessionalReport(link.dataset.id);
+        });
+
+        // Setup patient report form
+        const patientSearchInput = document.getElementById('patientSearchInput');
+        const patientSearchDropdown = document.getElementById('patientSearchDropdown');
+        const patientStartDate = document.getElementById('patientStartDate');
+        const patientEndDate = document.getElementById('patientEndDate');
+        const generatePatientReportBtn = document.getElementById('generatePatientReportBtn');
+
+        // Set default dates
+        const today = new Date();
+        const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+        patientStartDate.value = formatDateISO(firstDay);
+        patientEndDate.value = formatDateISO(today);
+
+        // Patient search
+        patientSearchInput.addEventListener('input', (e) => {
+            const search = e.target.value.toLowerCase().trim();
+            if (search.length < 1) {
+                patientSearchDropdown.style.display = 'none';
+                return;
+            }
+
+            const filtered = state.patients.filter(p => p.name.toLowerCase().includes(search));
+            patientSearchDropdown.innerHTML = filtered.map(p => 
+                `<div class="patient-search-item" data-id="${p.id}" style="padding: 10px 12px; cursor: pointer; border-bottom: 1px solid var(--border); font-size: 14px; transition: background 0.2s;">
+                    ${p.name}
+                </div>`
+            ).join('');
+
+            document.querySelectorAll('.patient-search-item').forEach(item => {
+                item.addEventListener('click', () => {
+                    const patientId = item.dataset.id;
+                    const patient = state.patients.find(p => p.id === patientId);
+                    patientSearchInput.value = patient.name;
+                    document.getElementById('selectedPatientId').value = patientId;
+                    patientSearchDropdown.style.display = 'none';
+                });
+            });
+
+            patientSearchDropdown.style.display = filtered.length > 0 ? 'block' : 'none';
+        });
+
+        // Generate report
+        generatePatientReportBtn.addEventListener('click', () => {
+            const patientId = document.getElementById('selectedPatientId').value;
+            const startDate = patientStartDate.value;
+            const endDate = patientEndDate.value;
+
+            if (!patientId) {
+                alert('Por favor, selecione um paciente');
+                return;
+            }
+
+            if (!startDate || !endDate) {
+                alert('Por favor, preencha as datas');
+                return;
+            }
+
+            openPatientReport(patientId, startDate, endDate);
+        });
+
+        // Close dropdown on click outside
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('#patientSearchInput') && !e.target.closest('#patientSearchDropdown')) {
+                patientSearchDropdown.style.display = 'none';
+            }
         });
     };
 
