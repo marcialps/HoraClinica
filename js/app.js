@@ -1997,7 +1997,7 @@
             <div class="card" style="background: white; padding: 32px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); margin-bottom: 24px;">
                 <h3 style="margin-bottom: 24px;">Relatório por Paciente</h3>
                 <div style="display: grid; grid-template-columns: 1fr 140px 140px 140px; gap: 16px; align-items: flex-end;">
-                    <div class="form-group">
+                    <div class="form-group" style="margin-bottom: 0; position: relative;">
                         <label style="display: block; font-size: 13px; font-weight: 600; margin-bottom: 8px; color: var(--text-main);">Paciente</label>
                         <input type="text" id="patientSearchInput" placeholder="Buscar paciente..." style="width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 14px;">
                         <div id="patientSearchDropdown" style="display: none; position: absolute; background: white; border: 1px solid var(--border); border-radius: 8px; max-height: 250px; overflow-y: auto; z-index: 1000; width: 100%; margin-top: 4px;"></div>
