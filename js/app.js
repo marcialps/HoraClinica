@@ -2165,23 +2165,23 @@
                             const prof = state.professionals.find(p => p.id === app.professionalId);
                             const profName = prof ? prof.name : 'Desconhecido';
                             
-                            return \`
+                            return `
                                 <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px; background: #f8fafc; border-radius: 6px; font-size: 13px; border: 1px solid #f1f5f9;">
                                     <div>
                                         <div style="font-weight: 600; color: var(--text-main); margin-bottom: 4px;">
-                                            <i class="fas fa-user-md" style="color: var(--primary); width: 16px;"></i> \${profName}
+                                            <i class="fas fa-user-md" style="color: var(--primary); width: 16px;"></i> ${profName}
                                         </div>
                                         <div style="font-size: 12px; color: var(--text-muted); display: flex; align-items: center; gap: 6px;">
-                                            <i class="far fa-calendar-alt"></i> \${app.date.split('-').reverse().join('/')} às \${app.time || ''}
+                                            <i class="far fa-calendar-alt"></i> ${app.date.split('-').reverse().join('/')} às ${app.time || ''}
                                         </div>
                                     </div>
                                     <div>
-                                        <span style="font-size: 10px; padding: 4px 10px; border-radius: 100px; background: \${getStatusBg(app.status)}; color: \${getStatusColor(app.status)}; font-weight: 700; text-transform: uppercase;">
-                                            \${getStatusText(app.status)}
+                                        <span style="font-size: 10px; padding: 4px 10px; border-radius: 100px; background: ${getStatusBg(app.status)}; color: ${getStatusColor(app.status)}; font-weight: 700; text-transform: uppercase;">
+                                            ${getStatusText(app.status)}
                                         </span>
                                     </div>
                                 </div>
-                            \`;
+                            `;
                         }).join('')}
                         ${filteredApps.length === 0 ? '<div style="text-align: center; color: var(--text-muted); font-size: 14px; padding: 30px;">Nenhuma consulta encontrada para este paciente neste período.</div>' : ''}
                     </div>
