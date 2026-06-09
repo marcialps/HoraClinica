@@ -2111,6 +2111,89 @@
         });
     };
 
+    const openPatientReport = (patientId, startDate, endDate) => {
+        const patient = state.patients.find(p => p.id === patientId);
+        if (!patient) return;
+
+        elements.modalTitle.innerText = `Relatório do Paciente: ${patient.name}`;
+        
+        // Filter appointments
+        const filteredApps = state.appointments.filter(app => {
+            if (app.patientId != patientId) return false;
+            return app.date >= startDate && app.date <= endDate;
+        }).sort((a, b) => b.date.localeCompare(a.date));
+
+        const getStatusText = (status) => {
+            switch (status) {
+                case 'present': return 'Presente';
+                case 'absent': return 'Faltou';
+                case 'absent_notice': return 'Avisou';
+                case 'cancelled_prof': return 'Cancelado (Prof)';
+                default: return 'Agendado';
+            }
+        };
+
+        const getStatusBg = (status) => {
+            switch (status) {
+                case 'present': return '#dcfce7';
+                case 'absent': return '#fee2e2';
+                case 'absent_notice': return '#ffedd5';
+                case 'cancelled_prof': return '#f3e8ff';
+                default: return '#dbeafe';
+            }
+        };
+
+        const getStatusColor = (status) => {
+            switch (status) {
+                case 'present': return '#16a34a';
+                case 'absent': return '#dc2626';
+                case 'absent_notice': return '#f59e0b';
+                case 'cancelled_prof': return '#7c3aed';
+                default: return '#2563eb';
+            }
+        };
+
+        elements.modalBody.innerHTML = `
+            <div class="detailed-report">
+                <div style="margin-bottom: 24px;">
+                    <p style="font-size: 14px; color: var(--text-muted); margin-bottom: 16px;">
+                        Mostrando consultas de <strong>${startDate.split('-').reverse().join('/')}</strong> a <strong>${endDate.split('-').reverse().join('/')}</strong>
+                    </p>
+                    
+                    <div style="max-height: 400px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding-right: 4px;">
+                        ${filteredApps.map(app => {
+                            const prof = state.professionals.find(p => p.id === app.professionalId);
+                            const profName = prof ? prof.name : 'Desconhecido';
+                            
+                            return \`
+                                <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px; background: #f8fafc; border-radius: 6px; font-size: 13px; border: 1px solid #f1f5f9;">
+                                    <div>
+                                        <div style="font-weight: 600; color: var(--text-main); margin-bottom: 4px;">
+                                            <i class="fas fa-user-md" style="color: var(--primary); width: 16px;"></i> \${profName}
+                                        </div>
+                                        <div style="font-size: 12px; color: var(--text-muted); display: flex; align-items: center; gap: 6px;">
+                                            <i class="far fa-calendar-alt"></i> \${app.date.split('-').reverse().join('/')} às \${app.time || ''}
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <span style="font-size: 10px; padding: 4px 10px; border-radius: 100px; background: \${getStatusBg(app.status)}; color: \${getStatusColor(app.status)}; font-weight: 700; text-transform: uppercase;">
+                                            \${getStatusText(app.status)}
+                                        </span>
+                                    </div>
+                                </div>
+                            \`;
+                        }).join('')}
+                        ${filteredApps.length === 0 ? '<div style="text-align: center; color: var(--text-muted); font-size: 14px; padding: 30px;">Nenhuma consulta encontrada para este paciente neste período.</div>' : ''}
+                    </div>
+                </div>
+                <div style="display: flex; justify-content: flex-end;">
+                    <button onclick="document.getElementById('modalOverlay').classList.add('hidden')" class="btn-primary" style="padding: 10px 24px;">Fechar</button>
+                </div>
+            </div>
+        `;
+
+        elements.modalOverlay.classList.remove('hidden');
+    };
 
     const openDetailedProfessionalReport = (profId) => {
         const prof = state.professionals.find(p => p.id === profId);
