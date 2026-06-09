@@ -2159,6 +2159,21 @@
                     <p style="font-size: 14px; color: var(--text-muted); margin-bottom: 16px;">
                         Mostrando consultas de <strong>${startDate.split('-').reverse().join('/')}</strong> a <strong>${endDate.split('-').reverse().join('/')}</strong>
                     </p>
+
+                    <div style="display: flex; gap: 12px; margin-bottom: 20px;">
+                        <div style="background: #f0fdf4; border: 1px solid #bbf7d0; padding: 8px 12px; border-radius: 8px; flex: 1; text-align: center;">
+                            <div style="font-size: 18px; font-weight: 700; color: #16a34a;">${filteredApps.filter(a => a.status === 'present').length}</div>
+                            <div style="font-size: 10px; color: #16a34a; text-transform: uppercase; font-weight: 600;">Presente</div>
+                        </div>
+                        <div style="background: #eff6ff; border: 1px solid #bfdbfe; padding: 8px 12px; border-radius: 8px; flex: 1; text-align: center;">
+                            <div style="font-size: 18px; font-weight: 700; color: #2563eb;">${filteredApps.filter(a => !a.status || a.status === 'scheduled').length}</div>
+                            <div style="font-size: 10px; color: #2563eb; text-transform: uppercase; font-weight: 600;">Agendado</div>
+                        </div>
+                        <div style="background: #fef2f2; border: 1px solid #fecaca; padding: 8px 12px; border-radius: 8px; flex: 1; text-align: center;">
+                            <div style="font-size: 18px; font-weight: 700; color: #dc2626;">${filteredApps.filter(a => a.status === 'cancelled' || a.status === 'cancelled_prof').length}</div>
+                            <div style="font-size: 10px; color: #dc2626; text-transform: uppercase; font-weight: 600;">Cancelado</div>
+                        </div>
+                    </div>
                     
                     <div style="max-height: 400px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding-right: 4px;">
                         ${filteredApps.map(app => {
