@@ -15,7 +15,8 @@
         recentlyDeletedIds: new Set(),
         isFirebaseLoaded: false, // Lista completa de clínicas carregada
         currentClinic: null, // Clínica ativa (link direto ?clinic=)
-        isClinicLoginReady: false // Metadados da clínica do link já consultados
+        isClinicLoginReady: false,
+        selectedProfessionals: ['all']
     };
 
     const CLINIC_CACHE_KEY = 'hc_clinic_v1';
@@ -214,7 +215,7 @@
                     const pass = document.getElementById('loginPass').value;
                     if (pass === p.password) {
                         state.currentUser = { role: 'professional', name: p.name, id: p.id, specialty: p.specialty };
-                        elements.professionalFilter.value = p.id;
+                        state.selectedProfessionals = [p.id];
                         elements.modalOverlay.classList.add('hidden');
                         finishLogin();
                     } else {
@@ -298,7 +299,7 @@
                 const pass = document.getElementById('clinicAdminPass').value;
                 if (pass === (clinic.adminPass || '123')) {
                     state.currentUser = { role: 'admin', name: 'Administrador' };
-                    elements.professionalFilter.value = 'all';
+                    state.selectedProfessionals = ['all'];
                     elements.modalOverlay.classList.add('hidden');
                     finishLogin();
                 } else {
@@ -348,14 +349,70 @@
     };
 
     const populateProfFilter = () => {
-        if (!elements.professionalFilter) return;
-        elements.professionalFilter.innerHTML = '<option value="all">Todos os Profissionais</option>';
+        if (!elements.customProfSelectDropdown) return;
+        
+        elements.customProfSelectDropdown.innerHTML = `
+            <label class="custom-select-option">
+                <input type="checkbox" value="all" ${state.selectedProfessionals.includes('all') ? 'checked' : ''}> 
+                Todos os Profissionais
+            </label>
+        `;
+        
         state.professionals.forEach(p => {
-            const opt = document.createElement('option');
-            opt.value = p.id;
-            opt.innerText = p.name;
-            elements.professionalFilter.appendChild(opt);
+            const isChecked = state.selectedProfessionals.includes(String(p.id));
+            elements.customProfSelectDropdown.innerHTML += `
+                <label class="custom-select-option">
+                    <input type="checkbox" value="${p.id}" ${isChecked ? 'checked' : ''}>
+                    ${p.name}
+                </label>
+            `;
         });
+
+        // Add event listeners to checkboxes
+        const checkboxes = elements.customProfSelectDropdown.querySelectorAll('input[type="checkbox"]');
+        checkboxes.forEach(cb => {
+            cb.onchange = (e) => {
+                const val = e.target.value;
+                if (val === 'all') {
+                    if (e.target.checked) {
+                        state.selectedProfessionals = ['all'];
+                    } else {
+                        state.selectedProfessionals = [];
+                    }
+                } else {
+                    // Remove 'all' if another is checked
+                    state.selectedProfessionals = state.selectedProfessionals.filter(id => id !== 'all');
+                    
+                    if (e.target.checked) {
+                        state.selectedProfessionals.push(val);
+                    } else {
+                        state.selectedProfessionals = state.selectedProfessionals.filter(id => id !== val);
+                    }
+                    
+                    if (state.selectedProfessionals.length === 0) {
+                        state.selectedProfessionals = ['all'];
+                    }
+                }
+                
+                // Update UI state
+                populateProfFilter(); 
+                updateProfSelectLabel();
+                renderView();
+            };
+        });
+        
+        updateProfSelectLabel();
+    };
+    
+    const updateProfSelectLabel = () => {
+        if (state.selectedProfessionals.includes('all')) {
+            elements.customProfSelectLabel.innerText = 'Todos os Profissionais';
+        } else if (state.selectedProfessionals.length === 1) {
+            const p = state.professionals.find(prof => String(prof.id) === String(state.selectedProfessionals[0]));
+            elements.customProfSelectLabel.innerText = p ? p.name : 'Selecionado';
+        } else {
+            elements.customProfSelectLabel.innerText = `${state.selectedProfessionals.length} Selecionados`;
+        }
     };
 
     // renderView com debounce para evitar múltiplos re-renders simultâneos
@@ -879,19 +936,25 @@
         const profsGrid = document.createElement('div');
         profsGrid.className = 'professionals-grid';
 
-        const filterVal = elements.professionalFilter.value;
         let isSingleProfessional = false;
         let singleProfessional = null;
+        let profsToShow = [];
 
         if (state.currentUser.role === 'professional') {
             isSingleProfessional = true;
             singleProfessional = state.professionals.find(p => String(p.id) === String(state.currentUser.id));
-            elements.professionalFilter.parentElement.classList.add('hidden');
+            elements.profFilterWrapper.classList.add('hidden');
+            profsToShow = [singleProfessional].filter(Boolean);
         } else {
-            elements.professionalFilter.parentElement.classList.remove('hidden');
-            if (filterVal !== 'all') {
-                isSingleProfessional = true;
-                singleProfessional = state.professionals.find(p => String(p.id) === String(filterVal));
+            elements.profFilterWrapper.classList.remove('hidden');
+            if (state.selectedProfessionals.includes('all')) {
+                profsToShow = state.professionals;
+            } else {
+                profsToShow = state.professionals.filter(p => state.selectedProfessionals.includes(String(p.id)));
+                if (profsToShow.length === 1) {
+                    isSingleProfessional = true;
+                    singleProfessional = profsToShow[0];
+                }
             }
         }
 
@@ -938,7 +1001,7 @@
             elements.viewTitle.innerText = 'Agenda do Dia';
             elements.currentDateDisplay.innerText = formatDate(state.currentDate);
 
-            state.professionals.forEach(prof => {
+            profsToShow.forEach(prof => {
                 const col = document.createElement('div');
                 col.className = 'professional-col';
 
@@ -2367,7 +2430,7 @@
     const simulateLoginAs = (profId) => {
         const prof = state.professionals.find(p => p.id === profId);
         state.currentUser = { role: 'professional', name: prof.name, id: prof.id };
-        elements.professionalFilter.value = prof.id;
+        state.selectedProfessionals = [prof.id];
         updateUserUI();
         switchView('agenda');
     };
@@ -2419,7 +2482,10 @@
                 nextDay: document.getElementById('nextDay'),
                 todayBtn: document.getElementById('todayBtn'),
                 hiddenDatePicker: document.getElementById('hiddenDatePicker'),
-                professionalFilter: document.getElementById('professionalFilter'),
+                customProfSelect: document.getElementById('customProfSelect'),
+                customProfSelectLabel: document.getElementById('customProfSelectLabel'),
+                customProfSelectDropdown: document.getElementById('customProfSelectDropdown'),
+                profFilterWrapper: document.getElementById('profFilterWrapper'),
                 addAppointmentBtn: document.getElementById('addAppointmentBtn'),
                 modalOverlay: document.getElementById('modalOverlay'),
                 modalTitle: document.getElementById('modalTitle'),
@@ -2497,14 +2563,14 @@
 
             elements.prevDay.onclick = () => {
                 const isWeekView = state.currentView === 'agenda' &&
-                    (state.currentUser.role === 'professional' || elements.professionalFilter.value !== 'all');
+                    (state.currentUser.role === 'professional' || (state.selectedProfessionals.length === 1 && !state.selectedProfessionals.includes('all')));
                 state.currentDate.setDate(state.currentDate.getDate() - (isWeekView ? 7 : 1));
                 renderView();
             };
 
             elements.nextDay.onclick = () => {
                 const isWeekView = state.currentView === 'agenda' &&
-                    (state.currentUser.role === 'professional' || elements.professionalFilter.value !== 'all');
+                    (state.currentUser.role === 'professional' || (state.selectedProfessionals.length === 1 && !state.selectedProfessionals.includes('all')));
                 state.currentDate.setDate(state.currentDate.getDate() + (isWeekView ? 7 : 1));
                 renderView();
             };
@@ -2534,7 +2600,18 @@
                 };
             }
 
-            elements.professionalFilter.onchange = () => renderView();
+            if (elements.customProfSelect) {
+                elements.customProfSelect.onclick = (e) => {
+                    e.stopPropagation();
+                    elements.customProfSelectDropdown.classList.toggle('hidden');
+                };
+                
+                document.addEventListener('click', (e) => {
+                    if (!elements.profFilterWrapper.contains(e.target)) {
+                        elements.customProfSelectDropdown.classList.add('hidden');
+                    }
+                });
+            }
 
             elements.agendaPatientSearch.oninput = (e) => {
                 state.agendaSearch = e.target.value;

@@ -1298,3 +1298,26 @@ h1, h2, h3, .logo span {
     animation: shimmer 1.4s infinite;
     border-radius: 8px;
 }
+
+.custom-select-option {
+    padding: 10px 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    cursor: pointer;
+    transition: background 0.2s;
+    font-size: 14px;
+    border-bottom: 1px solid var(--border);
+}
+.custom-select-option:last-child {
+    border-bottom: none;
+}
+.custom-select-option:hover {
+    background-color: var(--bg);
+}
+.custom-select-option input[type="checkbox"] {
+    cursor: pointer;
+    width: 16px;
+    height: 16px;
+    pointer-events: none;
+}

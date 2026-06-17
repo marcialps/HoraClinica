@@ -190,10 +190,14 @@
                                 style="width: 100%; padding: 8px 8px 8px 30px; border-radius: var(--radius-sm); border: 1px solid var(--border); font-size: 13px; outline: none;">
                         </div>
                     </div>
-                    <div class="filters">
-                        <select id="professionalFilter">
-                            <option value="all">Todos os Profissionais</option>
-                        </select>
+                    <div class="filters" id="profFilterWrapper" style="position: relative;">
+                        <div id="customProfSelect" class="custom-select" style="padding: 10px 16px; border-radius: var(--radius-sm); border: 1px solid var(--border); background-color: var(--surface); color: var(--text-main); font-size: 14px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; min-width: 220px;">
+                            <span id="customProfSelectLabel">Todos os Profissionais</span>
+                            <i class="fas fa-chevron-down"></i>
+                        </div>
+                        <div id="customProfSelectDropdown" class="custom-select-dropdown hidden" style="position: absolute; top: 100%; right: 0; min-width: 100%; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); box-shadow: var(--shadow-md); z-index: 50; margin-top: 4px; max-height: 300px; overflow-y: auto;">
+                            <!-- Checkboxes injected here -->
+                        </div>
                     </div>
                     <button id="addAppointmentBtn" class="btn-primary admin-only">
                         <i class="fas fa-plus"></i> Novo Agendamento
