@@ -12,11 +12,11 @@
         insurances: [],
         columnWidth: 150,
         agendaSearch: '',
+        selectedProfessionalIds: [],
         recentlyDeletedIds: new Set(),
         isFirebaseLoaded: false, // Lista completa de clínicas carregada
         currentClinic: null, // Clínica ativa (link direto ?clinic=)
-        isClinicLoginReady: false,
-        selectedProfessionals: ['all']
+        isClinicLoginReady: false // Metadados da clínica do link já consultados
     };
 
     const CLINIC_CACHE_KEY = 'hc_clinic_v1';
@@ -215,7 +215,8 @@
                     const pass = document.getElementById('loginPass').value;
                     if (pass === p.password) {
                         state.currentUser = { role: 'professional', name: p.name, id: p.id, specialty: p.specialty };
-                        state.selectedProfessionals = [p.id];
+                        state.selectedProfessionalIds = [p.id];
+                        updateProfessionalFilterUI();
                         elements.modalOverlay.classList.add('hidden');
                         finishLogin();
                     } else {
@@ -299,7 +300,8 @@
                 const pass = document.getElementById('clinicAdminPass').value;
                 if (pass === (clinic.adminPass || '123')) {
                     state.currentUser = { role: 'admin', name: 'Administrador' };
-                    state.selectedProfessionals = ['all'];
+                    state.selectedProfessionalIds = state.professionals.map(p => p.id);
+                    updateProfessionalFilterUI();
                     elements.modalOverlay.classList.add('hidden');
                     finishLogin();
                 } else {
@@ -348,71 +350,145 @@
         }
     };
 
-    const populateProfFilter = () => {
-        if (!elements.customProfSelectDropdown) return;
-        
-        elements.customProfSelectDropdown.innerHTML = `
-            <label class="custom-select-option">
-                <input type="checkbox" value="all" ${state.selectedProfessionals.includes('all') ? 'checked' : ''}> 
-                Todos os Profissionais
-            </label>
-        `;
-        
-        state.professionals.forEach(p => {
-            const isChecked = state.selectedProfessionals.includes(String(p.id));
-            elements.customProfSelectDropdown.innerHTML += `
-                <label class="custom-select-option">
-                    <input type="checkbox" value="${p.id}" ${isChecked ? 'checked' : ''}>
-                    ${p.name}
-                </label>
-            `;
+    const updateProfessionalFilterText = () => {
+        const textSpan = document.querySelector('.multiselect-selected-text');
+        if (!textSpan) return;
+
+        const total = state.professionals.length;
+        const selectedCount = state.selectedProfessionalIds.length;
+
+        if (selectedCount === 0) {
+            textSpan.innerText = 'Selecionar Profissionais';
+        } else if (selectedCount === total) {
+            textSpan.innerText = 'Todos os Profissionais';
+        } else if (selectedCount === 1) {
+            const prof = state.professionals.find(p => p.id === state.selectedProfessionalIds[0]);
+            textSpan.innerText = prof ? prof.name : '1 Profissional';
+        } else if (selectedCount <= 3) {
+            const names = state.selectedProfessionalIds
+                .map(id => {
+                    const p = state.professionals.find(prof => prof.id === id);
+                    return p ? p.name : '';
+                })
+                .filter(name => name !== '');
+            textSpan.innerText = names.join(', ');
+        } else {
+            textSpan.innerText = `${selectedCount} Profissionais`;
+        }
+    };
+
+    const updateProfessionalFilterUI = () => {
+        const dropdown = document.getElementById('professionalFilterDropdown');
+        if (!dropdown) return;
+
+        const allCb = dropdown.querySelector('#prof-opt-all');
+        if (allCb) {
+            allCb.checked = state.selectedProfessionalIds.length === state.professionals.length;
+        }
+
+        const checkboxes = dropdown.querySelectorAll('.prof-checkbox');
+        checkboxes.forEach(cb => {
+            cb.checked = state.selectedProfessionalIds.includes(cb.value);
         });
 
-        // Add event listeners to checkboxes
-        const checkboxes = elements.customProfSelectDropdown.querySelectorAll('input[type="checkbox"]');
-        checkboxes.forEach(cb => {
-            cb.onchange = (e) => {
-                const val = e.target.value;
-                if (val === 'all') {
-                    if (e.target.checked) {
-                        state.selectedProfessionals = ['all'];
-                    } else {
-                        state.selectedProfessionals = [];
+        updateProfessionalFilterText();
+    };
+
+    const populateProfFilter = () => {
+        if (!elements.professionalFilter) return;
+
+        // Sync selected ids with current list of professionals
+        const existingIds = state.professionals.map(p => p.id);
+        state.selectedProfessionalIds = state.selectedProfessionalIds.filter(id => existingIds.includes(id));
+        
+        if (state.currentUser?.role === 'professional') {
+            state.selectedProfessionalIds = [state.currentUser.id];
+        } else if (state.selectedProfessionalIds.length === 0) {
+            state.selectedProfessionalIds = [...existingIds];
+        }
+
+        const dropdown = document.getElementById('professionalFilterDropdown');
+        if (!dropdown) return;
+
+        dropdown.innerHTML = '';
+
+        // "Todos os Profissionais" option
+        const allChecked = state.selectedProfessionalIds.length === state.professionals.length;
+        const allOption = document.createElement('div');
+        allOption.className = 'multiselect-option';
+        allOption.innerHTML = `
+            <input type="checkbox" id="prof-opt-all" ${allChecked ? 'checked' : ''}>
+            <label for="prof-opt-all" style="cursor: pointer; flex-grow: 1; margin: 0;">Todos os Profissionais</label>
+        `;
+        
+        const allCheckbox = allOption.querySelector('input');
+        allCheckbox.addEventListener('change', (e) => {
+            const checked = e.target.checked;
+            if (checked) {
+                state.selectedProfessionalIds = state.professionals.map(p => p.id);
+            } else {
+                state.selectedProfessionalIds = [];
+            }
+            // Update individual checkboxes
+            const checkboxes = dropdown.querySelectorAll('.prof-checkbox');
+            checkboxes.forEach(cb => {
+                cb.checked = checked;
+            });
+            updateProfessionalFilterText();
+            renderViewDebounced();
+        });
+
+        allOption.addEventListener('click', (e) => {
+            if (e.target !== allCheckbox && e.target.tagName !== 'LABEL') {
+                allCheckbox.checked = !allCheckbox.checked;
+                allCheckbox.dispatchEvent(new Event('change'));
+            }
+        });
+
+        dropdown.appendChild(allOption);
+
+        // Individual professional options
+        state.professionals.forEach(p => {
+            const isChecked = state.selectedProfessionalIds.includes(p.id);
+            const opt = document.createElement('div');
+            opt.className = 'multiselect-option';
+            opt.innerHTML = `
+                <input type="checkbox" value="${p.id}" class="prof-checkbox" id="prof-opt-${p.id}" ${isChecked ? 'checked' : ''}>
+                <label for="prof-opt-${p.id}" style="cursor: pointer; flex-grow: 1; margin: 0;">${p.name}</label>
+            `;
+
+            const cb = opt.querySelector('input');
+            cb.addEventListener('change', (e) => {
+                const checked = e.target.checked;
+                if (checked) {
+                    if (!state.selectedProfessionalIds.includes(p.id)) {
+                        state.selectedProfessionalIds.push(p.id);
                     }
                 } else {
-                    // Remove 'all' if another is checked
-                    state.selectedProfessionals = state.selectedProfessionals.filter(id => id !== 'all');
-                    
-                    if (e.target.checked) {
-                        state.selectedProfessionals.push(val);
-                    } else {
-                        state.selectedProfessionals = state.selectedProfessionals.filter(id => id !== val);
-                    }
-                    
-                    if (state.selectedProfessionals.length === 0) {
-                        state.selectedProfessionals = ['all'];
-                    }
+                    state.selectedProfessionalIds = state.selectedProfessionalIds.filter(id => id !== p.id);
                 }
-                
-                // Update UI state
-                populateProfFilter(); 
-                updateProfSelectLabel();
-                renderView();
-            };
+
+                // Update "All" checkbox
+                const allCb = dropdown.querySelector('#prof-opt-all');
+                if (allCb) {
+                    allCb.checked = state.selectedProfessionalIds.length === state.professionals.length;
+                }
+
+                updateProfessionalFilterText();
+                renderViewDebounced();
+            });
+
+            opt.addEventListener('click', (e) => {
+                if (e.target !== cb && e.target.tagName !== 'LABEL') {
+                    cb.checked = !cb.checked;
+                    cb.dispatchEvent(new Event('change'));
+                }
+            });
+
+            dropdown.appendChild(opt);
         });
-        
-        updateProfSelectLabel();
-    };
-    
-    const updateProfSelectLabel = () => {
-        if (state.selectedProfessionals.includes('all')) {
-            elements.customProfSelectLabel.innerText = 'Todos os Profissionais';
-        } else if (state.selectedProfessionals.length === 1) {
-            const p = state.professionals.find(prof => String(prof.id) === String(state.selectedProfessionals[0]));
-            elements.customProfSelectLabel.innerText = p ? p.name : 'Selecionado';
-        } else {
-            elements.customProfSelectLabel.innerText = `${state.selectedProfessionals.length} Selecionados`;
-        }
+
+        updateProfessionalFilterText();
     };
 
     // renderView com debounce para evitar múltiplos re-renders simultâneos
@@ -914,15 +990,15 @@
 
     const renderAgenda = () => {
         elements.viewContent.innerHTML = '';
-
+ 
         // Sync hidden date picker value
         if (elements.hiddenDatePicker) {
             elements.hiddenDatePicker.value = formatDateISO(state.currentDate);
         }
-
+ 
         const grid = document.createElement('div');
         grid.className = 'agenda-grid';
-
+ 
         const timeCol = document.createElement('div');
         timeCol.className = 'time-column';
         for (let h = 7; h <= 18; h++) {
@@ -932,98 +1008,108 @@
             timeCol.appendChild(slot);
         }
         grid.appendChild(timeCol);
-
+ 
         const profsGrid = document.createElement('div');
         profsGrid.className = 'professionals-grid';
-
+ 
         let isSingleProfessional = false;
         let singleProfessional = null;
-        let profsToShow = [];
-
+ 
         if (state.currentUser.role === 'professional') {
             isSingleProfessional = true;
             singleProfessional = state.professionals.find(p => String(p.id) === String(state.currentUser.id));
-            elements.profFilterWrapper.classList.add('hidden');
-            profsToShow = [singleProfessional].filter(Boolean);
+            if (elements.professionalFilter) {
+                elements.professionalFilter.classList.add('hidden');
+            }
         } else {
-            elements.profFilterWrapper.classList.remove('hidden');
-            if (state.selectedProfessionals.includes('all')) {
-                profsToShow = state.professionals;
-            } else {
-                profsToShow = state.professionals.filter(p => state.selectedProfessionals.includes(String(p.id)));
-                if (profsToShow.length === 1) {
-                    isSingleProfessional = true;
-                    singleProfessional = profsToShow[0];
-                }
+            if (elements.professionalFilter) {
+                elements.professionalFilter.classList.remove('hidden');
+            }
+            if (state.selectedProfessionalIds.length === 1) {
+                isSingleProfessional = true;
+                singleProfessional = state.professionals.find(p => String(p.id) === String(state.selectedProfessionalIds[0]));
             }
         }
-
+ 
         if (isSingleProfessional && singleProfessional) {
             elements.viewTitle.innerText = `Agenda da Semana - ${singleProfessional.name}`;
-
+ 
             const startOfWeek = new Date(state.currentDate);
             const day = startOfWeek.getDay();
             startOfWeek.setDate(startOfWeek.getDate() - day);
-
+ 
             const endOfWeek = new Date(startOfWeek);
             endOfWeek.setDate(startOfWeek.getDate() + 6);
             elements.currentDateDisplay.innerText = `${startOfWeek.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })} até ${endOfWeek.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}`;
-
+ 
             const dayNames = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
-
+ 
             for (let i = 0; i < 7; i++) {
                 const currentDay = new Date(startOfWeek);
                 currentDay.setDate(startOfWeek.getDate() + i);
-
+ 
                 const col = document.createElement('div');
                 col.className = 'professional-col';
-
+ 
                 const header = document.createElement('div');
                 header.className = 'prof-header';
                 header.style.flexDirection = 'column';
                 header.style.lineHeight = '1.2';
                 header.innerHTML = `<div>${dayNames[currentDay.getDay()]}</div><div style="font-size: 12px; color: var(--text-muted); font-weight: normal;">${currentDay.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}</div>`;
                 col.appendChild(header);
-
+ 
                 const container = document.createElement('div');
                 container.className = 'appointments-container';
-
+ 
                 const dayApps = getAppointmentsForDay(currentDay, singleProfessional.id);
                 dayApps.forEach(app => {
                     const card = createAppointmentCard(app);
                     container.appendChild(card);
                 });
-
+ 
                 col.appendChild(container);
                 profsGrid.appendChild(col);
             }
         } else {
             elements.viewTitle.innerText = 'Agenda do Dia';
             elements.currentDateDisplay.innerText = formatDate(state.currentDate);
+ 
+            const visibleProfs = state.professionals.filter(p => state.selectedProfessionalIds.includes(p.id));
 
-            profsToShow.forEach(prof => {
-                const col = document.createElement('div');
-                col.className = 'professional-col';
-
-                const header = document.createElement('div');
-                header.className = 'prof-header';
-                header.innerText = prof.name;
-                col.appendChild(header);
-
-                const container = document.createElement('div');
-                container.className = 'appointments-container';
-
-                const dayApps = getAppointmentsForDay(state.currentDate, prof.id);
-                dayApps.forEach(app => {
-                    const card = createAppointmentCard(app);
-                    container.appendChild(card);
+            if (visibleProfs.length === 0) {
+                const emptyMessage = document.createElement('div');
+                emptyMessage.style.textAlign = 'center';
+                emptyMessage.style.color = 'var(--text-muted)';
+                emptyMessage.style.padding = '40px';
+                emptyMessage.style.width = '100%';
+                emptyMessage.style.fontSize = '14px';
+                emptyMessage.innerHTML = '<i class="fas fa-user-md" style="font-size: 32px; display: block; margin-bottom: 12px; color: var(--text-muted);"></i> Selecione pelo menos um profissional para visualizar a agenda.';
+                profsGrid.appendChild(emptyMessage);
+            } else {
+                visibleProfs.forEach(prof => {
+                    const col = document.createElement('div');
+                    col.className = 'professional-col';
+     
+                    const header = document.createElement('div');
+                    header.className = 'prof-header';
+                    header.innerText = prof.name;
+                    col.appendChild(header);
+     
+                    const container = document.createElement('div');
+                    container.className = 'appointments-container';
+     
+                    const dayApps = getAppointmentsForDay(state.currentDate, prof.id);
+                    dayApps.forEach(app => {
+                        const card = createAppointmentCard(app);
+                        container.appendChild(card);
+                    });
+     
+                    col.appendChild(container);
+                    profsGrid.appendChild(col);
                 });
-
-                col.appendChild(container);
-                profsGrid.appendChild(col);
-            });
+            }
         }
-
+ 
         grid.appendChild(profsGrid);
         elements.viewContent.appendChild(grid);
     };
@@ -2430,7 +2516,8 @@
     const simulateLoginAs = (profId) => {
         const prof = state.professionals.find(p => p.id === profId);
         state.currentUser = { role: 'professional', name: prof.name, id: prof.id };
-        state.selectedProfessionals = [prof.id];
+        state.selectedProfessionalIds = [prof.id];
+        updateProfessionalFilterUI();
         updateUserUI();
         switchView('agenda');
     };
@@ -2482,10 +2569,7 @@
                 nextDay: document.getElementById('nextDay'),
                 todayBtn: document.getElementById('todayBtn'),
                 hiddenDatePicker: document.getElementById('hiddenDatePicker'),
-                customProfSelect: document.getElementById('customProfSelect'),
-                customProfSelectLabel: document.getElementById('customProfSelectLabel'),
-                customProfSelectDropdown: document.getElementById('customProfSelectDropdown'),
-                profFilterWrapper: document.getElementById('profFilterWrapper'),
+                professionalFilter: document.getElementById('professionalFilterContainer'),
                 addAppointmentBtn: document.getElementById('addAppointmentBtn'),
                 modalOverlay: document.getElementById('modalOverlay'),
                 modalTitle: document.getElementById('modalTitle'),
@@ -2563,14 +2647,14 @@
 
             elements.prevDay.onclick = () => {
                 const isWeekView = state.currentView === 'agenda' &&
-                    (state.currentUser.role === 'professional' || (state.selectedProfessionals.length === 1 && !state.selectedProfessionals.includes('all')));
+                    (state.currentUser.role === 'professional' || state.selectedProfessionalIds.length === 1);
                 state.currentDate.setDate(state.currentDate.getDate() - (isWeekView ? 7 : 1));
                 renderView();
             };
 
             elements.nextDay.onclick = () => {
                 const isWeekView = state.currentView === 'agenda' &&
-                    (state.currentUser.role === 'professional' || (state.selectedProfessionals.length === 1 && !state.selectedProfessionals.includes('all')));
+                    (state.currentUser.role === 'professional' || state.selectedProfessionalIds.length === 1);
                 state.currentDate.setDate(state.currentDate.getDate() + (isWeekView ? 7 : 1));
                 renderView();
             };
@@ -2600,15 +2684,19 @@
                 };
             }
 
-            if (elements.customProfSelect) {
-                elements.customProfSelect.onclick = (e) => {
+            // Setup custom multiselect dropdown trigger toggling and outside click closing
+            const filterTrigger = document.getElementById('professionalFilterTrigger');
+            const filterDropdown = document.getElementById('professionalFilterDropdown');
+            if (filterTrigger && filterDropdown) {
+                filterTrigger.onclick = (e) => {
                     e.stopPropagation();
-                    elements.customProfSelectDropdown.classList.toggle('hidden');
+                    filterDropdown.classList.toggle('hidden');
                 };
-                
+
                 document.addEventListener('click', (e) => {
-                    if (!elements.profFilterWrapper.contains(e.target)) {
-                        elements.customProfSelectDropdown.classList.add('hidden');
+                    const filterContainer = document.getElementById('professionalFilterContainer');
+                    if (filterContainer && !filterContainer.contains(e.target)) {
+                        filterDropdown.classList.add('hidden');
                     }
                 });
             }
