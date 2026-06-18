@@ -1414,3 +1414,51 @@ h1, h2, h3, .logo span {
     color: var(--text-main);
     cursor: pointer;
 }
+
+/* ─── Skeleton Loader (stale-while-revalidate) ───────────────────────────── */
+/* Exibido na grade de agenda enquanto os dados chegam do Firestore.          */
+/* Remove a sensação de "travamento" — a UI aparece imediatamente.           */
+
+@keyframes skeleton-shimmer {
+    0%   { background-position: -600px 0; }
+    100% { background-position:  600px 0; }
+}
+
+.skeleton {
+    background: linear-gradient(
+        90deg,
+        #e2e8f0 25%,
+        #f1f5f9 50%,
+        #e2e8f0 75%
+    );
+    background-size: 1200px 100%;
+    animation: skeleton-shimmer 1.4s infinite linear;
+    border-radius: var(--radius-sm);
+}
+
+/* Card fantasma dentro das colunas */
+.skeleton-card {
+    position: absolute;
+    left: 4px;
+    right: 4px;
+    border-radius: var(--radius-sm);
+    opacity: 0.7;
+}
+
+/* Texto fantasma no cabeçalho da coluna */
+.skeleton-text {
+    display: block;
+    border-radius: 4px;
+}
+
+/* Grade de agenda no estado skeleton: opacidade reduzida */
+.skeleton-grid {
+    opacity: 0.85;
+    pointer-events: none; /* evita cliques acidentais durante load */
+}
+
+/* Hora lateral levemente apagada no skeleton */
+.skeleton-time {
+    color: #cbd5e1;
+}
+/* ──────────────────────────────────────────────────────────────────────────── */

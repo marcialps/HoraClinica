@@ -39,6 +39,47 @@
         } catch { /* ignore */ }
     };
 
+    // ─── Cache de Dados (stale-while-revalidate) ───────────────────────────────
+    // Guarda professionals, patients, appointments e insurances no localStorage.
+    // Na próxima entrada, exibe imediatamente com os dados em cache enquanto o
+    // Firestore atualiza em background — elimina o travamento inicial.
+
+    const DATA_CACHE_VERSION = 'v1';
+    const DATA_CACHE_TTL_MS  = 24 * 60 * 60 * 1000; // 24 h
+
+    const _dataCacheKey = (clinicId, collection) =>
+        `hc_data_${DATA_CACHE_VERSION}_${clinicId}_${collection}`;
+
+    const getDataCache = (clinicId, collection) => {
+        try {
+            const raw = localStorage.getItem(_dataCacheKey(clinicId, collection));
+            if (!raw) return null;
+            const { data, ts } = JSON.parse(raw);
+            if (Date.now() - ts > DATA_CACHE_TTL_MS) return null; // expirado
+            return data;
+        } catch {
+            return null;
+        }
+    };
+
+    const setDataCache = (clinicId, collection, data) => {
+        try {
+            localStorage.setItem(
+                _dataCacheKey(clinicId, collection),
+                JSON.stringify({ data, ts: Date.now() })
+            );
+        } catch { /* quota exceeded — ignora */ }
+    };
+
+    const clearDataCache = (clinicId) => {
+        try {
+            ['professionals', 'patients', 'appointments', 'insurances'].forEach(col => {
+                localStorage.removeItem(_dataCacheKey(clinicId, col));
+            });
+        } catch { /* ignore */ }
+    };
+    // ──────────────────────────────────────────────────────────────────────────
+
     const getActiveClinic = () =>
         state.currentClinic || state.clinics.find(c => c.id === state.currentClinicId);
 
@@ -566,6 +607,27 @@
     const setupClinicAppListeners = (clinicId) => {
         const clinicRef = db.collection('clinics').doc(clinicId);
 
+        // ── FASE 1: Renderizar instantaneamente com dados em cache ────────────
+        const cachedProfs  = getDataCache(clinicId, 'professionals');
+        const cachedPats   = getDataCache(clinicId, 'patients');
+        const cachedApps   = getDataCache(clinicId, 'appointments');
+        const cachedIns    = getDataCache(clinicId, 'insurances');
+        const hasCache     = cachedProfs && cachedPats;
+
+        if (hasCache) {
+            state.professionals = cachedProfs;
+            state.patients      = cachedPats;
+            state.appointments  = (cachedApps || []).filter(app => {
+                const id = app.id != null ? String(app.id).trim() : '';
+                return !state.recentlyDeletedIds.has(id);
+            });
+            state.insurances    = cachedIns || [];
+            // Renderiza imediatamente — sem esperar Firestore
+            populateProfFilter();
+            renderView();
+        }
+        // ─────────────────────────────────────────────────────────────────────
+
         if (!state.currentClinic) {
             const unsubClinic = clinicRef.onSnapshot(doc => {
                 if (doc.exists) upsertClinicInState({ ...doc.data(), id: doc.id });
@@ -573,14 +635,11 @@
             unsubscribes.push(unsubClinic);
         }
 
-        const unsubPatients = clinicRef.collection('patients').onSnapshot(snapshot => {
-            state.patients = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
-            if (state.currentUser) renderViewDebounced();
-        });
-        unsubscribes.push(unsubPatients);
-
+        // ── Listener de Profissionais ─────────────────────────────────────────
         const unsubProfs = clinicRef.collection('professionals').onSnapshot(snapshot => {
-            state.professionals = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+            const fresh = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+            state.professionals = fresh;
+            setDataCache(clinicId, 'professionals', fresh);
             if (state.currentUser) {
                 populateProfFilter();
                 renderViewDebounced();
@@ -588,18 +647,62 @@
         });
         unsubscribes.push(unsubProfs);
 
-        const unsubApps = clinicRef.collection('appointments').onSnapshot(snapshot => {
-            const loadedApps = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
-            state.appointments = loadedApps.filter(app => {
-                const appNormId = app.id != null ? String(app.id).trim() : '';
-                return !state.recentlyDeletedIds.has(appNormId);
-            });
+        // ── Listener de Pacientes ─────────────────────────────────────────────
+        const unsubPatients = clinicRef.collection('patients').onSnapshot(snapshot => {
+            const fresh = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+            state.patients = fresh;
+            setDataCache(clinicId, 'patients', fresh);
             if (state.currentUser) renderViewDebounced();
         });
-        unsubscribes.push(unsubApps);
+        unsubscribes.push(unsubPatients);
 
+        // ── Listener de Agendamentos (filtrado por range de datas) ────────────
+        // Traz apenas os últimos 60 dias + próximos 180 dias para reduzir o
+        // volume de dados. Em caso de erro de índice, faz fallback sem filtro.
+        const today      = new Date();
+        const dateFrom   = new Date(today); dateFrom.setDate(today.getDate() - 60);
+        const dateTo     = new Date(today); dateTo.setDate(today.getDate() + 180);
+        const dateFromStr = dateFrom.toISOString().slice(0, 10);
+        const dateToStr   = dateTo.toISOString().slice(0, 10);
+
+        const applyAppSnapshot = (snapshot) => {
+            const fresh = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+            setDataCache(clinicId, 'appointments', fresh);
+            state.appointments = fresh.filter(app => {
+                const id = app.id != null ? String(app.id).trim() : '';
+                return !state.recentlyDeletedIds.has(id);
+            });
+            if (state.currentUser) renderViewDebounced();
+        };
+
+        const setupAppListener = (useFilter) => {
+            const ref = useFilter
+                ? clinicRef.collection('appointments')
+                    .where('date', '>=', dateFromStr)
+                    .where('date', '<=', dateToStr)
+                : clinicRef.collection('appointments');
+
+            const unsub = ref.onSnapshot(
+                applyAppSnapshot,
+                (err) => {
+                    if (useFilter) {
+                        console.warn('Índice de appointments não disponível, usando fallback completo:', err.message);
+                        setupAppListener(false); // fallback sem filtro
+                    } else {
+                        console.error('Erro no listener de appointments:', err);
+                    }
+                }
+            );
+            unsubscribes.push(unsub);
+        };
+        setupAppListener(true);
+        // ─────────────────────────────────────────────────────────────────────
+
+        // ── Listener de Convênios ─────────────────────────────────────────────
         const unsubInsurances = clinicRef.collection('insurances').onSnapshot(snapshot => {
-            state.insurances = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+            const fresh = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+            state.insurances = fresh;
+            setDataCache(clinicId, 'insurances', fresh);
             if (state.currentUser && state.currentView === 'pacientes') renderPacientes();
         });
         unsubscribes.push(unsubInsurances);
@@ -624,6 +727,11 @@
                 setupClinicLoginListeners(state.currentClinicId);
             }
         }
+    };
+
+    // Limpa o cache de dados ao fazer logout para não vazar dados entre usuários
+    const clearUserDataCache = () => {
+        if (state.currentClinicId) clearDataCache(state.currentClinicId);
     };
 
     const saveData = async (collection, data) => {
@@ -988,7 +1096,42 @@
         });
     };
 
+    // Skeleton loader da grade de agenda — exibido enquanto dados chegam
+    const renderAgendaSkeleton = () => {
+        elements.viewContent.innerHTML = '';
+        if (elements.hiddenDatePicker) {
+            elements.hiddenDatePicker.value = formatDateISO(state.currentDate);
+        }
+        elements.viewTitle.innerText = 'Carregando Agenda...';
+
+        const cols = 3; // colunas placeholder
+        let skHtml = `<div class="agenda-grid skeleton-grid">`;
+        skHtml += `<div class="time-column">`;
+        for (let h = 7; h <= 18; h++) {
+            skHtml += `<div class="time-slot skeleton-time">${h}:00</div>`;
+        }
+        skHtml += `</div><div class="professionals-grid">`;
+        for (let c = 0; c < cols; c++) {
+            skHtml += `<div class="professional-col">`;
+            skHtml += `<div class="prof-header"><div class="skeleton skeleton-text" style="width:80%;height:16px;"></div></div>`;
+            skHtml += `<div class="appointments-container">`;
+            // Uns cards fantasma para dar sensação de conteúdo
+            [[60,0],[150,45],[320,30],[500,60]].forEach(([top,h]) => {
+                skHtml += `<div class="skeleton skeleton-card" style="top:${top}px;height:${h||45}px;"></div>`;
+            });
+            skHtml += `</div></div>`;
+        }
+        skHtml += `</div></div>`;
+        elements.viewContent.innerHTML = skHtml;
+    };
+
     const renderAgenda = () => {
+        // Mostrar skeleton se profissionais ainda não chegaram
+        if (state.professionals.length === 0) {
+            renderAgendaSkeleton();
+            return;
+        }
+
         elements.viewContent.innerHTML = '';
  
         // Sync hidden date picker value
@@ -2723,6 +2866,7 @@
             elements.addAppointmentBtn.onclick = () => openNewAppointmentModal();
             elements.closeModal.onclick = () => elements.modalOverlay.classList.add('hidden');
             elements.logoutBtn.onclick = () => {
+                clearUserDataCache(); // limpa cache de dados da clínica
                 state.currentUser = null;
                 state.currentClinicId = null;
                 // Limpar localStorage ao fazer logout
