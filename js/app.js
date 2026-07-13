@@ -1227,7 +1227,7 @@
             }
         }
  
-        elements.viewContent.innerHTML = timeColHtml + profsHtml + '</div>';
+        elements.viewContent.innerHTML = '<div class="agenda-grid">' + timeColHtml + profsHtml + '</div>';
 
         // Event delegation para os cards de appointment (criados via innerHTML)
         const agendaGrid = elements.viewContent.querySelector('.agenda-grid');
