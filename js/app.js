@@ -2313,15 +2313,34 @@
         });
     };
 
+    const fetchAllAppointments = async (clinicId) => {
+        if (state._allAppointments) return state._allAppointments;
+        try {
+            const snap = await db.collection('clinics').doc(clinicId)
+                .collection('appointments')
+                .orderBy('date', 'asc')
+                .get();
+            state._allAppointments = snap.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+            state._allAppointmentsByDate = buildAppointmentsIndex(state._allAppointments);
+        } catch (e) {
+            console.error('Erro ao buscar histórico completo:', e);
+            state._allAppointments = state.appointments;
+            state._allAppointmentsByDate = state.appointmentsByDate;
+        }
+        return state._allAppointments;
+    };
+
     const renderRelatorios = () => {
         elements.viewTitle.innerText = 'Relatórios de Gestão';
 
+        const apps = state._allAppointments || state.appointments;
+
         // Agrega em uma única passada (em vez de 3+ filters separados)
-        const totalApps = state.appointments.length;
+        const totalApps = apps.length;
         let presentApps = 0;
         const profCounts = {};
-        for (let i = 0; i < state.appointments.length; i++) {
-            const a = state.appointments[i];
+        for (let i = 0; i < apps.length; i++) {
+            const a = apps[i];
             if (a.status === 'present') presentApps++;
             const pid = a.professionalId;
             profCounts[pid] = (profCounts[pid] || 0) + 1;
@@ -2333,6 +2352,15 @@
             name: p.name,
             count: profCounts[p.id] || 0
         }));
+
+        // Busca histórico completo em background (se ainda não carregou)
+        if (!state._allAppointments && state.currentClinicId) {
+            fetchAllAppointments(state.currentClinicId).then(() => {
+                if (state.currentView === 'relatorios') renderRelatorios();
+            });
+            elements.viewContent.innerHTML = '<div style="text-align:center;padding:60px;color:var(--text-muted);"><i class="fas fa-spinner fa-spin" style="font-size:32px;display:block;margin-bottom:16px;"></i>Carregando histórico completo de agendamentos...</div>';
+            return;
+        }
 
         elements.viewContent.innerHTML = `
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 24px; margin-bottom: 40px;">
@@ -2481,15 +2509,16 @@
 
         elements.modalTitle.innerText = `Relatório do Paciente: ${patient.name}`;
         
-        // Filter appointments usando o índice por data (mais rápido)
+        // Usa histórico completo se disponível, senão usa o range atual
+        const appsIndex = state._allAppointmentsByDate || state.appointmentsByDate;
         const filteredApps = [];
         const start = startDate;
         const end = endDate;
-        const dateKeys = Object.keys(state.appointmentsByDate);
+        const dateKeys = Object.keys(appsIndex);
         for (let di = 0; di < dateKeys.length; di++) {
             const d = dateKeys[di];
             if (d >= start && d <= end) {
-                const dayApps = state.appointmentsByDate[d];
+                const dayApps = appsIndex[d];
                 for (let ai = 0; ai < dayApps.length; ai++) {
                     if (dayApps[ai].patientId == patientId) {
                         filteredApps.push(dayApps[ai]);
@@ -2653,13 +2682,14 @@
     const renderDetailedReportContent = (profId, startDate, endDate) => {
         const container = document.getElementById('reportResultsContainer');
 
-        // Usa o índice por data para filtrar mais rápido
+        // Usa histórico completo se disponível, senão usa o range atual
+        const appsIndex = state._allAppointmentsByDate || state.appointmentsByDate;
         const filteredApps = [];
-        const dateKeys = Object.keys(state.appointmentsByDate);
+        const dateKeys = Object.keys(appsIndex);
         for (let di = 0; di < dateKeys.length; di++) {
             const d = dateKeys[di];
             if (d >= startDate && d <= endDate) {
-                const dayApps = state.appointmentsByDate[d];
+                const dayApps = appsIndex[d];
                 for (let ai = 0; ai < dayApps.length; ai++) {
                     if (dayApps[ai].professionalId == profId) {
                         filteredApps.push(dayApps[ai]);
