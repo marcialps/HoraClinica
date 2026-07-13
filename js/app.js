@@ -6,6 +6,7 @@
         patients: [],
         professionals: [],
         appointments: [],
+        appointmentsByDate: {}, // Map<dateStr, Appointment[]> para lookup O(1)
         currentDate: new Date(new Date().setHours(0, 0, 0, 0)),
         currentUser: null, // Start logged out
         currentView: 'agenda',
@@ -621,6 +622,7 @@
                 const id = app.id != null ? String(app.id).trim() : '';
                 return !state.recentlyDeletedIds.has(id);
             });
+            state.appointmentsByDate = buildAppointmentsIndex(state.appointments);
             state.insurances    = cachedIns || [];
             // Renderiza imediatamente — sem esperar Firestore
             populateProfFilter();
@@ -657,11 +659,11 @@
         unsubscribes.push(unsubPatients);
 
         // ── Listener de Agendamentos (filtrado por range de datas) ────────────
-        // Traz apenas os últimos 60 dias + próximos 180 dias para reduzir o
+        // Traz apenas os últimos 30 dias + próximos 90 dias para reduzir o
         // volume de dados. Em caso de erro de índice, faz fallback sem filtro.
         const today      = new Date();
-        const dateFrom   = new Date(today); dateFrom.setDate(today.getDate() - 60);
-        const dateTo     = new Date(today); dateTo.setDate(today.getDate() + 180);
+        const dateFrom   = new Date(today); dateFrom.setDate(today.getDate() - 30);
+        const dateTo     = new Date(today); dateTo.setDate(today.getDate() + 90);
         const dateFromStr = dateFrom.toISOString().slice(0, 10);
         const dateToStr   = dateTo.toISOString().slice(0, 10);
 
@@ -672,6 +674,7 @@
                 const id = app.id != null ? String(app.id).trim() : '';
                 return !state.recentlyDeletedIds.has(id);
             });
+            state.appointmentsByDate = buildAppointmentsIndex(state.appointments);
             if (state.currentUser) renderViewDebounced();
         };
 
@@ -1134,26 +1137,18 @@
 
         elements.viewContent.innerHTML = '';
  
-        // Sync hidden date picker value
         if (elements.hiddenDatePicker) {
             elements.hiddenDatePicker.value = formatDateISO(state.currentDate);
         }
  
-        const grid = document.createElement('div');
-        grid.className = 'agenda-grid';
- 
-        const timeCol = document.createElement('div');
-        timeCol.className = 'time-column';
+        // Constrói o HTML completo como string (mais rápido que criar nós DOM um a um)
+        let timeColHtml = '<div class="time-column">';
         for (let h = 7; h <= 18; h++) {
-            const slot = document.createElement('div');
-            slot.className = 'time-slot';
-            slot.innerText = `${h}:00`;
-            timeCol.appendChild(slot);
+            timeColHtml += `<div class="time-slot">${h}:00</div>`;
         }
-        grid.appendChild(timeCol);
+        timeColHtml += '</div>';
  
-        const profsGrid = document.createElement('div');
-        profsGrid.className = 'professionals-grid';
+        let profsHtml = '<div class="professionals-grid">';
  
         let isSingleProfessional = false;
         let singleProfessional = null;
@@ -1191,27 +1186,19 @@
                 const currentDay = new Date(startOfWeek);
                 currentDay.setDate(startOfWeek.getDate() + i);
  
-                const col = document.createElement('div');
-                col.className = 'professional-col';
- 
-                const header = document.createElement('div');
-                header.className = 'prof-header';
-                header.style.flexDirection = 'column';
-                header.style.lineHeight = '1.2';
-                header.innerHTML = `<div>${dayNames[currentDay.getDay()]}</div><div style="font-size: 12px; color: var(--text-muted); font-weight: normal;">${currentDay.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}</div>`;
-                col.appendChild(header);
- 
-                const container = document.createElement('div');
-                container.className = 'appointments-container';
- 
                 const dayApps = getAppointmentsForDay(currentDay, singleProfessional.id);
-                dayApps.forEach(app => {
-                    const card = createAppointmentCard(app);
-                    container.appendChild(card);
-                });
+                let cardsHtml = '';
+                for (let j = 0; j < dayApps.length; j++) {
+                    cardsHtml += createAppointmentCardHTML(dayApps[j]);
+                }
  
-                col.appendChild(container);
-                profsGrid.appendChild(col);
+                profsHtml += `<div class="professional-col">
+                    <div class="prof-header" style="flex-direction:column;line-height:1.2;">
+                        <div>${dayNames[currentDay.getDay()]}</div>
+                        <div style="font-size:12px;color:var(--text-muted);font-weight:normal;">${currentDay.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}</div>
+                    </div>
+                    <div class="appointments-container">${cardsHtml}</div>
+                </div>`;
             }
         } else {
             elements.viewTitle.innerText = 'Agenda do Dia';
@@ -1220,72 +1207,108 @@
             const visibleProfs = state.professionals.filter(p => state.selectedProfessionalIds.includes(p.id));
 
             if (visibleProfs.length === 0) {
-                const emptyMessage = document.createElement('div');
-                emptyMessage.style.textAlign = 'center';
-                emptyMessage.style.color = 'var(--text-muted)';
-                emptyMessage.style.padding = '40px';
-                emptyMessage.style.width = '100%';
-                emptyMessage.style.fontSize = '14px';
-                emptyMessage.innerHTML = '<i class="fas fa-user-md" style="font-size: 32px; display: block; margin-bottom: 12px; color: var(--text-muted);"></i> Selecione pelo menos um profissional para visualizar a agenda.';
-                profsGrid.appendChild(emptyMessage);
+                profsHtml += `<div style="text-align:center;color:var(--text-muted);padding:40px;width:100%;font-size:14px;">
+                    <i class="fas fa-user-md" style="font-size:32px;display:block;margin-bottom:12px;color:var(--text-muted);"></i>
+                    Selecione pelo menos um profissional para visualizar a agenda.
+                </div>`;
             } else {
-                visibleProfs.forEach(prof => {
-                    const col = document.createElement('div');
-                    col.className = 'professional-col';
-     
-                    const header = document.createElement('div');
-                    header.className = 'prof-header';
-                    header.innerText = prof.name;
-                    col.appendChild(header);
-     
-                    const container = document.createElement('div');
-                    container.className = 'appointments-container';
-     
+                for (let pi = 0; pi < visibleProfs.length; pi++) {
+                    const prof = visibleProfs[pi];
                     const dayApps = getAppointmentsForDay(state.currentDate, prof.id);
-                    dayApps.forEach(app => {
-                        const card = createAppointmentCard(app);
-                        container.appendChild(card);
-                    });
-     
-                    col.appendChild(container);
-                    profsGrid.appendChild(col);
-                });
+                    let cardsHtml = '';
+                    for (let j = 0; j < dayApps.length; j++) {
+                        cardsHtml += createAppointmentCardHTML(dayApps[j]);
+                    }
+                    profsHtml += `<div class="professional-col">
+                        <div class="prof-header">${prof.name}</div>
+                        <div class="appointments-container">${cardsHtml}</div>
+                    </div>`;
+                }
             }
         }
  
-        grid.appendChild(profsGrid);
-        elements.viewContent.appendChild(grid);
+        elements.viewContent.innerHTML = timeColHtml + profsHtml + '</div>';
+
+        // Event delegation para os cards de appointment (criados via innerHTML)
+        const agendaGrid = elements.viewContent.querySelector('.agenda-grid');
+        if (agendaGrid) {
+            agendaGrid.onclick = (e) => {
+                const card = e.target.closest('.appointment-card');
+                if (card && card.dataset.appId) {
+                    const app = state.appointments.find(a => String(a.id) === String(card.dataset.appId));
+                    if (app) openAppointmentDetails(app);
+                }
+            };
+        }
+    };
+
+    // Índice de appointments agrupados por data para lookup O(1)
+    const buildAppointmentsIndex = (appointments) => {
+        const index = {};
+        for (let i = 0; i < appointments.length; i++) {
+            const app = appointments[i];
+            const d = app.date;
+            if (!index[d]) index[d] = [];
+            index[d].push(app);
+        }
+        return index;
     };
 
     const getAppointmentsForDay = (date, profId) => {
         const dateStr = formatDateISO(date);
-        return state.appointments.filter(app => {
-            if (app.professionalId != profId) return false;
+        const dayApps = state.appointmentsByDate[dateStr];
+        if (!dayApps) return [];
 
-            // Search filter
+        // Pré-calcula contagem de grupos recorrentes (uma vez por chamada)
+        const recurringGroupCounts = {};
+        const countRecurring = (groupId) => {
+            if (!groupId) return 0;
+            if (recurringGroupCounts[groupId] !== undefined) return recurringGroupCounts[groupId];
+            let count = 0;
+            const apps = state.appointments;
+            for (let i = 0; i < apps.length; i++) {
+                if (apps[i].recurringGroupId && String(apps[i].recurringGroupId).trim() === groupId) count++;
+            }
+            recurringGroupCounts[groupId] = count;
+            return count;
+        };
+
+        const result = [];
+        for (let i = 0; i < dayApps.length; i++) {
+            const app = dayApps[i];
+            if (app.professionalId != profId) continue;
+
             if (state.agendaSearch) {
                 const patient = state.patients.find(p => p.id == app.patientId);
                 if (!patient || !patient.name.toLowerCase().includes(state.agendaSearch.toLowerCase())) {
-                    return false;
+                    continue;
                 }
             }
 
-            if (app.date === dateStr) return true;
+            if (app.date === dateStr) {
+                result.push(app);
+                continue;
+            }
 
             if (app.recurring && app.recurringType === 'weekly') {
                 const groupId = app.recurringGroupId ? String(app.recurringGroupId).trim() : '';
-                const groupCount = state.appointments.filter(a => a.recurringGroupId && String(a.recurringGroupId).trim() === groupId).length;
-                // If the recurring series already has one document per occurrence, do not "project" additional dates.
-                if (groupId && groupCount > 1) {
-                    return false;
+                if (groupId) {
+                    let groupCount = 0;
+                    for (let j = 0; j < state.appointments.length; j++) {
+                        const a = state.appointments[j];
+                        if (a.recurringGroupId && String(a.recurringGroupId).trim() === groupId) groupCount++;
+                    }
+                    if (groupCount > 1) continue;
                 }
 
                 const [y, m, d] = app.date.split('-').map(Number);
                 const appDate = new Date(y, m - 1, d);
-                return date >= appDate && date.getDay() === appDate.getDay();
+                if (date >= appDate && date.getDay() === appDate.getDay()) {
+                    result.push(app);
+                }
             }
-            return false;
-        });
+        }
+        return result;
     };
 
     const createAppointmentCard = (app) => {
@@ -1307,6 +1330,19 @@
 
         card.onclick = () => openAppointmentDetails(app);
         return card;
+    };
+
+    const createAppointmentCardHTML = (app) => {
+        const [h, m] = app.time.split(':').map(Number);
+        const top = ((h - 7) * 60) + m;
+        const height = app.duration || 45;
+        const patient = state.patients.find(p => p.id == app.patientId);
+        const patientName = patient ? patient.name : 'Desconhecido';
+        const endTime = addMinutes(app.time, height);
+        return `<div class="appointment-card ${app.status || ''}" style="top:${top}px;height:${height}px;" data-app-id="${app.id}">
+            <span class="time">${app.time} - ${endTime}</span>
+            <span class="patient">${patientName}</span>
+        </div>`;
     };
 
     const openNewAppointmentModal = () => {
@@ -1960,16 +1996,29 @@
             }
         };
 
+        const PATIENTS_PAGE_SIZE = 50;
+        let patientPage = 0;
+        let patientFiltered = [];
+
         const renderTableRows = (term = "") => {
             const tbody = document.getElementById('patientTableBody');
-            const filtered = state.patients.filter(p =>
+            patientFiltered = state.patients.filter(p =>
                 p.name.toLowerCase().includes(term.toLowerCase()) ||
                 (p.responsible && p.responsible.toLowerCase().includes(term.toLowerCase())) ||
                 (p.phone && p.phone.includes(term)) ||
                 (p.city && p.city.toLowerCase().includes(term.toLowerCase()))
             );
+            patientPage = 0;
+            renderPatientPage();
+        };
 
-            tbody.innerHTML = filtered.map(p => `
+        const renderPatientPage = () => {
+            const tbody = document.getElementById('patientTableBody');
+            const start = patientPage * PATIENTS_PAGE_SIZE;
+            const pageItems = patientFiltered.slice(start, start + PATIENTS_PAGE_SIZE);
+            const hasMore = start + PATIENTS_PAGE_SIZE < patientFiltered.length;
+
+            tbody.innerHTML = pageItems.map(p => `
                 <tr style="border-bottom: 1px solid #f1f5f9;">
                     <td style="padding: 12px;">
                         <div class="patient-name-link" data-id="${p.id}" style="font-weight: 600; color: var(--primary); cursor: pointer;">${p.name}</div>
@@ -2021,6 +2070,20 @@
                     if (patient) openPatientDetails(patient);
                 };
             });
+
+            if (hasMore) {
+                const loadMoreRow = document.createElement('tr');
+                loadMoreRow.innerHTML = `<td colspan="5" style="text-align:center;padding:16px;">
+                    <button id="loadMorePatientsBtn" class="btn-secondary" style="padding:8px 24px;margin:0;font-size:13px;">
+                        <i class="fas fa-chevron-down"></i> Carregar mais (${patientFiltered.length - start - PATIENTS_PAGE_SIZE} restantes)
+                    </button>
+                </td>`;
+                tbody.appendChild(loadMoreRow);
+                document.getElementById('loadMorePatientsBtn').onclick = () => {
+                    patientPage++;
+                    renderPatientPage();
+                };
+            }
         };
 
         const openEditModal = (patient) => {
@@ -2253,14 +2316,23 @@
     const renderRelatorios = () => {
         elements.viewTitle.innerText = 'Relatórios de Gestão';
 
+        // Agrega em uma única passada (em vez de 3+ filters separados)
         const totalApps = state.appointments.length;
-        const presentApps = state.appointments.filter(a => a.status === 'present').length;
+        let presentApps = 0;
+        const profCounts = {};
+        for (let i = 0; i < state.appointments.length; i++) {
+            const a = state.appointments[i];
+            if (a.status === 'present') presentApps++;
+            const pid = a.professionalId;
+            profCounts[pid] = (profCounts[pid] || 0) + 1;
+        }
         const attendanceRate = totalApps > 0 ? Math.round((presentApps / totalApps) * 100) : 0;
 
-        const appsPerProf = state.professionals.map(p => {
-            const count = state.appointments.filter(a => a.professionalId === p.id).length;
-            return { id: p.id, name: p.name, count };
-        });
+        const appsPerProf = state.professionals.map(p => ({
+            id: p.id,
+            name: p.name,
+            count: profCounts[p.id] || 0
+        }));
 
         elements.viewContent.innerHTML = `
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 24px; margin-bottom: 40px;">
@@ -2409,11 +2481,33 @@
 
         elements.modalTitle.innerText = `Relatório do Paciente: ${patient.name}`;
         
-        // Filter appointments
-        const filteredApps = state.appointments.filter(app => {
-            if (app.patientId != patientId) return false;
-            return app.date >= startDate && app.date <= endDate;
-        }).sort((a, b) => b.date.localeCompare(a.date));
+        // Filter appointments usando o índice por data (mais rápido)
+        const filteredApps = [];
+        const start = startDate;
+        const end = endDate;
+        const dateKeys = Object.keys(state.appointmentsByDate);
+        for (let di = 0; di < dateKeys.length; di++) {
+            const d = dateKeys[di];
+            if (d >= start && d <= end) {
+                const dayApps = state.appointmentsByDate[d];
+                for (let ai = 0; ai < dayApps.length; ai++) {
+                    if (dayApps[ai].patientId == patientId) {
+                        filteredApps.push(dayApps[ai]);
+                    }
+                }
+            }
+        }
+        filteredApps.sort((a, b) => b.date.localeCompare(a.date));
+
+        // Agrega status em uma única passada
+        let presentCount = 0, scheduledCount = 0, absentCount = 0, cancelledCount = 0;
+        for (let i = 0; i < filteredApps.length; i++) {
+            const s = filteredApps[i].status;
+            if (s === 'present') presentCount++;
+            else if (s === 'absent' || s === 'absent_notice') absentCount++;
+            else if (s === 'cancelled' || s === 'cancelled_prof') cancelledCount++;
+            else scheduledCount++;
+        }
 
         const getStatusText = (status) => {
             switch (status) {
@@ -2454,15 +2548,15 @@
 
                     <div style="display: flex; gap: 12px; margin-bottom: 20px;">
                         <div style="background: #f0fdf4; border: 1px solid #bbf7d0; padding: 8px 12px; border-radius: 8px; flex: 1; text-align: center;">
-                            <div style="font-size: 18px; font-weight: 700; color: #16a34a;">${filteredApps.filter(a => a.status === 'present').length}</div>
+                            <div style="font-size: 18px; font-weight: 700; color: #16a34a;">${presentCount}</div>
                             <div style="font-size: 10px; color: #16a34a; text-transform: uppercase; font-weight: 600;">Presente</div>
                         </div>
                         <div style="background: #eff6ff; border: 1px solid #bfdbfe; padding: 8px 12px; border-radius: 8px; flex: 1; text-align: center;">
-                            <div style="font-size: 18px; font-weight: 700; color: #2563eb;">${filteredApps.filter(a => !a.status || a.status === 'scheduled').length}</div>
+                            <div style="font-size: 18px; font-weight: 700; color: #2563eb;">${scheduledCount}</div>
                             <div style="font-size: 10px; color: #2563eb; text-transform: uppercase; font-weight: 600;">Agendado</div>
                         </div>
                         <div style="background: #fef2f2; border: 1px solid #fecaca; padding: 8px 12px; border-radius: 8px; flex: 1; text-align: center;">
-                            <div style="font-size: 18px; font-weight: 700; color: #dc2626;">${filteredApps.filter(a => a.status === 'absent' || a.status === 'absent_notice').length}</div>
+                            <div style="font-size: 18px; font-weight: 700; color: #dc2626;">${absentCount}</div>
                             <div style="font-size: 10px; color: #dc2626; text-transform: uppercase; font-weight: 600;">Faltou</div>
                         </div>
                         <div style="background: #faf5ff; border: 1px solid #e9d5ff; padding: 8px 12px; border-radius: 8px; flex: 1; text-align: center;">
@@ -2559,14 +2653,28 @@
     const renderDetailedReportContent = (profId, startDate, endDate) => {
         const container = document.getElementById('reportResultsContainer');
 
-        const filteredApps = state.appointments.filter(app => {
-            if (app.professionalId != profId) return false;
-            return app.date >= startDate && app.date <= endDate;
-        });
+        // Usa o índice por data para filtrar mais rápido
+        const filteredApps = [];
+        const dateKeys = Object.keys(state.appointmentsByDate);
+        for (let di = 0; di < dateKeys.length; di++) {
+            const d = dateKeys[di];
+            if (d >= startDate && d <= endDate) {
+                const dayApps = state.appointmentsByDate[d];
+                for (let ai = 0; ai < dayApps.length; ai++) {
+                    if (dayApps[ai].professionalId == profId) {
+                        filteredApps.push(dayApps[ai]);
+                    }
+                }
+            }
+        }
 
         const total = filteredApps.length;
-        const present = filteredApps.filter(a => a.status == 'present').length;
-        const absent = filteredApps.filter(a => a.status == 'absent' || a.status == 'absent_notice').length;
+        let present = 0, absent = 0;
+        for (let i = 0; i < filteredApps.length; i++) {
+            const s = filteredApps[i].status;
+            if (s == 'present') present++;
+            else if (s == 'absent' || s == 'absent_notice') absent++;
+        }
 
         const patients = filteredApps.map(a => {
             const p = state.patients.find(pat => pat.id == a.patientId);
