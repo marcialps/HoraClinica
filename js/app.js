@@ -2568,63 +2568,103 @@
             }
         };
 
+        const getProfName = (app) => {
+            const prof = state.professionals.find(p => p.id === app.professionalId);
+            return prof ? prof.name : 'Desconhecido';
+        };
+
+        const renderPatientReportContent = (query) => {
+            const q = (query || '').trim().toLowerCase();
+            const visibleApps = q
+                ? filteredApps.filter(app => getProfName(app).toLowerCase().includes(q))
+                : filteredApps;
+
+            let pCount = 0, sCount = 0, aCount = 0, cCount = 0;
+            for (let i = 0; i < visibleApps.length; i++) {
+                const s = visibleApps[i].status;
+                if (s === 'present') pCount++;
+                else if (s === 'absent' || s === 'absent_notice') aCount++;
+                else if (s === 'cancelled' || s === 'cancelled_prof') cCount++;
+                else sCount++;
+            }
+
+            const listHtml = visibleApps.map(app => {
+                const profName = getProfName(app);
+                return `
+                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px; background: #f8fafc; border-radius: 6px; font-size: 13px; border: 1px solid #f1f5f9;">
+                        <div>
+                            <div style="font-weight: 600; color: var(--text-main); margin-bottom: 4px;">
+                                <i class="fas fa-user-md" style="color: var(--primary); width: 16px;"></i> ${profName}
+                            </div>
+                            <div style="font-size: 12px; color: var(--text-muted); display: flex; align-items: center; gap: 6px;">
+                                <i class="far fa-calendar-alt"></i> ${app.date.split('-').reverse().join('/')} às ${app.time || ''}
+                            </div>
+                        </div>
+                        <div>
+                            <span style="font-size: 10px; padding: 4px 10px; border-radius: 100px; background: ${getStatusBg(app.status)}; color: ${getStatusColor(app.status)}; font-weight: 700; text-transform: uppercase;">
+                                ${getStatusText(app.status)}
+                            </span>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            const noResults = visibleApps.length === 0
+                ? '<div style="text-align: center; color: var(--text-muted); font-size: 14px; padding: 30px;">Nenhuma consulta encontrada para este paciente neste período.</div>'
+                : '';
+
+            return `
+                <div style="display: flex; gap: 12px; margin-bottom: 20px;">
+                    <div style="background: #f0fdf4; border: 1px solid #bbf7d0; padding: 8px 12px; border-radius: 8px; flex: 1; text-align: center;">
+                        <div style="font-size: 18px; font-weight: 700; color: #16a34a;">${pCount}</div>
+                        <div style="font-size: 10px; color: #16a34a; text-transform: uppercase; font-weight: 600;">Presente</div>
+                    </div>
+                    <div style="background: #eff6ff; border: 1px solid #bfdbfe; padding: 8px 12px; border-radius: 8px; flex: 1; text-align: center;">
+                        <div style="font-size: 18px; font-weight: 700; color: #2563eb;">${sCount}</div>
+                        <div style="font-size: 10px; color: #2563eb; text-transform: uppercase; font-weight: 600;">Agendado</div>
+                    </div>
+                    <div style="background: #fef2f2; border: 1px solid #fecaca; padding: 8px 12px; border-radius: 8px; flex: 1; text-align: center;">
+                        <div style="font-size: 18px; font-weight: 700; color: #dc2626;">${aCount}</div>
+                        <div style="font-size: 10px; color: #dc2626; text-transform: uppercase; font-weight: 600;">Faltou</div>
+                    </div>
+                    <div style="background: #faf5ff; border: 1px solid #e9d5ff; padding: 8px 12px; border-radius: 8px; flex: 1; text-align: center;">
+                        <div style="font-size: 18px; font-weight: 700; color: #9333ea;">${cCount}</div>
+                        <div style="font-size: 10px; color: #9333ea; text-transform: uppercase; font-weight: 600;">Cancelado</div>
+                    </div>
+                </div>
+
+                <div style="max-height: 400px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding-right: 4px;">
+                    ${listHtml}
+                    ${noResults}
+                </div>
+            `;
+        };
+
         elements.modalBody.innerHTML = `
             <div class="detailed-report">
                 <div style="margin-bottom: 24px;">
+                    <div style="position: relative; margin-bottom: 16px;">
+                        <input type="text" id="patientReportProfSearch" placeholder="Buscar profissional..." style="width: 100%; padding: 10px 12px 10px 36px; border: 1px solid var(--border); border-radius: 8px; font-size: 14px;">
+                        <i class="fas fa-search" style="position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 13px;"></i>
+                    </div>
+
                     <p style="font-size: 14px; color: var(--text-muted); margin-bottom: 16px;">
                         Mostrando consultas de <strong>${startDate.split('-').reverse().join('/')}</strong> a <strong>${endDate.split('-').reverse().join('/')}</strong>
                     </p>
 
-                    <div style="display: flex; gap: 12px; margin-bottom: 20px;">
-                        <div style="background: #f0fdf4; border: 1px solid #bbf7d0; padding: 8px 12px; border-radius: 8px; flex: 1; text-align: center;">
-                            <div style="font-size: 18px; font-weight: 700; color: #16a34a;">${presentCount}</div>
-                            <div style="font-size: 10px; color: #16a34a; text-transform: uppercase; font-weight: 600;">Presente</div>
-                        </div>
-                        <div style="background: #eff6ff; border: 1px solid #bfdbfe; padding: 8px 12px; border-radius: 8px; flex: 1; text-align: center;">
-                            <div style="font-size: 18px; font-weight: 700; color: #2563eb;">${scheduledCount}</div>
-                            <div style="font-size: 10px; color: #2563eb; text-transform: uppercase; font-weight: 600;">Agendado</div>
-                        </div>
-                        <div style="background: #fef2f2; border: 1px solid #fecaca; padding: 8px 12px; border-radius: 8px; flex: 1; text-align: center;">
-                            <div style="font-size: 18px; font-weight: 700; color: #dc2626;">${absentCount}</div>
-                            <div style="font-size: 10px; color: #dc2626; text-transform: uppercase; font-weight: 600;">Faltou</div>
-                        </div>
-                        <div style="background: #faf5ff; border: 1px solid #e9d5ff; padding: 8px 12px; border-radius: 8px; flex: 1; text-align: center;">
-                            <div style="font-size: 18px; font-weight: 700; color: #9333ea;">${filteredApps.filter(a => a.status === 'cancelled' || a.status === 'cancelled_prof').length}</div>
-                            <div style="font-size: 10px; color: #9333ea; text-transform: uppercase; font-weight: 600;">Cancelado</div>
-                        </div>
-                    </div>
-                    
-                    <div style="max-height: 400px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding-right: 4px;">
-                        ${filteredApps.map(app => {
-                            const prof = state.professionals.find(p => p.id === app.professionalId);
-                            const profName = prof ? prof.name : 'Desconhecido';
-                            
-                            return `
-                                <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px; background: #f8fafc; border-radius: 6px; font-size: 13px; border: 1px solid #f1f5f9;">
-                                    <div>
-                                        <div style="font-weight: 600; color: var(--text-main); margin-bottom: 4px;">
-                                            <i class="fas fa-user-md" style="color: var(--primary); width: 16px;"></i> ${profName}
-                                        </div>
-                                        <div style="font-size: 12px; color: var(--text-muted); display: flex; align-items: center; gap: 6px;">
-                                            <i class="far fa-calendar-alt"></i> ${app.date.split('-').reverse().join('/')} às ${app.time || ''}
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <span style="font-size: 10px; padding: 4px 10px; border-radius: 100px; background: ${getStatusBg(app.status)}; color: ${getStatusColor(app.status)}; font-weight: 700; text-transform: uppercase;">
-                                            ${getStatusText(app.status)}
-                                        </span>
-                                    </div>
-                                </div>
-                            `;
-                        }).join('')}
-                        ${filteredApps.length === 0 ? '<div style="text-align: center; color: var(--text-muted); font-size: 14px; padding: 30px;">Nenhuma consulta encontrada para este paciente neste período.</div>' : ''}
-                    </div>
+                    <div id="patientReportContent">${renderPatientReportContent('')}</div>
                 </div>
                 <div style="display: flex; justify-content: flex-end;">
                     <button onclick="document.getElementById('modalOverlay').classList.add('hidden')" class="btn-primary" style="padding: 10px 24px;">Fechar</button>
                 </div>
             </div>
         `;
+
+        const patientReportProfSearch = document.getElementById('patientReportProfSearch');
+        const patientReportContent = document.getElementById('patientReportContent');
+        patientReportProfSearch.addEventListener('input', (e) => {
+            patientReportContent.innerHTML = renderPatientReportContent(e.target.value);
+        });
 
         elements.modalOverlay.classList.remove('hidden');
     };
