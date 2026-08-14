@@ -2806,11 +2806,9 @@
                 <h4 style="font-size: 14px; margin-bottom: 12px;">Pacientes no Período</h4>
                 <div style="max-height: 250px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding-right: 4px;">
                     ${patients.map(p => {
-            const currentMonthStr = formatDateISO(new Date()).substring(0, 7);
-            const monthlyCount = state.appointments.filter(app =>
+            const periodCount = filteredApps.filter(app =>
                 app.patientId == p.patientId &&
-                app.status == 'present' &&
-                app.date.startsWith(currentMonthStr)
+                app.status == 'present'
             ).length;
 
             return `
@@ -2820,7 +2818,7 @@
                                 <div style="font-size: 11px; color: var(--text-muted);">${p.date.split('-').reverse().join('/')}</div>
                             </div>
                             <div style="display: flex; align-items: center; gap: 8px;">
-                                ${monthlyCount > 0 ? `<span title="Total de presenças no mês" style="background: #eff6ff; color: #2563eb; font-weight: 800; padding: 2px 8px; border-radius: 4px; font-size: 11px; border: 1px solid #dbeafe; display: flex; align-items: center; gap: 4px;"><span style="font-weight: 500; font-size: 10px; opacity: 0.8;">Neste mês:</span>${monthlyCount}</span>` : ''}
+                                ${periodCount > 0 ? `<span title="Total de presenças no período" style="background: #eff6ff; color: #2563eb; font-weight: 800; padding: 2px 8px; border-radius: 4px; font-size: 11px; border: 1px solid #dbeafe; display: flex; align-items: center; gap: 4px;"><span style="font-weight: 500; font-size: 10px; opacity: 0.8;">No período:</span>${periodCount}</span>` : ''}
                                 <span style="font-size: 10px; padding: 2px 8px; border-radius: 100px; background: ${getStatusBg(p.status)}; color: ${getStatusColor(p.status)}; font-weight: 700; text-transform: uppercase;">
                                     ${getStatusText(p.status)}
                                 </span>
